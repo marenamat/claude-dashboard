@@ -1,21 +1,24 @@
 recorded_at: '2026-04-05'
 branch: issue-1-base-implementation
-status: in_progress
+status: complete
 issue: 1
 summary: >
   Implemented base dashboard (issue #1).
   - generate-data.py: parses clanker.log files, emits www/data.cbor and
     injects content into www/index.html via index.template.html.
   - src/lib.rs + Cargo.toml: Rust WASM module; render_dashboard() deserialises
-    CBOR and returns HTML for JS injection.
+    CBOR and returns HTML for JS injection.  Includes ISO timestamp parsing and
+    duration computation (no extra dependencies).
   - www/index.template.html: HTML5 template, Bootstrap layout, noscript-safe.
   - www/dashboard.css: styles.
   - www/dashboard.js: JS glue loading WASM and CBOR, falls back to static HTML.
   - nginx/dashboard.conf: nginx server block for local / proxied serving.
   - build.sh: downloads Bootstrap, runs wasm-pack, runs generate-data.py.
   - config.yaml: list of projects to include in the dashboard.
+  - .github/workflows/build.yml: CI workflow; builds WASM + data, uploads
+    www/ as a downloadable artifact for preview.
 outstanding:
   - Missing packages must be installed before build.sh can run (see claude/questions.md):
       rust toolchain + wasm32-unknown-unknown target, wasm-pack, python3-cbor2
-  - Main branch has diverged from origin/main (local has self-improvements commit,
-    origin has readme update). Needs manual merge/rebase by Maria.
+  - Local main (3a576a9) diverges from origin/main (5a0aafa, README update).
+    origin/main needs merging locally; human guardian handles this.
