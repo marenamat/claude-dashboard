@@ -1,4 +1,4 @@
-recorded_at: '2026-04-05T21:00:00Z'
+recorded_at: '2026-04-05T20:55:00Z'
 branch: issue-2-separate-nginx
 status: complete
 ci_status:
@@ -36,6 +36,11 @@ session_2026-04-05_issue2:
   - etc/init.d/claude-dashboard: sysvinit LSB init script (start/stop/reload/restart/status).
     Manages the nginx instance on the clankers machine via start-stop-daemon.
   - claude/design/base.md: updated Nginx binding section to document the two-machine topology.
+session_2026-04-05_workflow_check:
+  - Both issues #1 and #2 are complete on issue-2-separate-nginx branch.
+  - CI failures on origin/main: wasm-pack approach still in main (fix in this branch).
+  - No new issues or design changes. Branch is ready for merge.
+  - GitHub Pages enablement still pending (human guardian action required).
 session_2026-04-05_deploy:
   - Added .github/workflows/deploy.yml for branch preview deployments.
   - Deploys main to gh-pages root; other branches to gh-pages/preview/<branch>/.
