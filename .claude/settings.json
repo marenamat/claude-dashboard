@@ -10,7 +10,8 @@
       "Bash(python:*)",
       "Bash(pip3 *:*)",
       "Bash(apk list:*)",
-      "Bash(apk search:*)"
+      "Bash(apk search:*)",
+      "Bash(cargo *)"
     ],
     "deny": [
       "Bash(npm *)"

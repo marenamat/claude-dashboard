@@ -1,0 +1,51 @@
+# Deploy docs/ to GitHub Pages preview on every push to non-main branches.
+# Produces a downloadable artifact and a named preview deployment for review
+# before merging to main.
+
+name: Preview GitHub Pages
+
+on:
+  push:
+    branches-ignore: [main]
+    paths: [docs/**]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-preview-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages-preview
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Upload docs/ as a downloadable artifact so the human guardian can
+      # inspect the HTML before accepting into main.
+      - name: Upload docs artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pages-preview-${{ github.sha }}
+          path: docs/
+          retention-days: 7
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/
+
+      - name: Deploy to GitHub Pages (preview)
+        id: deployment
+        uses: actions/deploy-pages@v4
