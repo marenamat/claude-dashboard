@@ -5,6 +5,12 @@ set -e
 self=$(readlink -f "$0")
 selfdir=$(dirname "$self")
 
+if [ "x$1" == "x--force" ]; then
+  force=true
+else
+  force=false
+fi
+
 cd "$selfdir"
 
 echo "===========" >> clanker.log
@@ -38,7 +44,7 @@ restart_flag="$selfdir/.clanker-restart-$$"
 
   echo "Prep decision: $decision" >>clanker.log
 
-  if [ "$decision" = "INVOKE_CLAUDE" ]; then
+  if $force || [ "$decision" = "INVOKE_CLAUDE" ]; then
     ~/.local/bin/claude \
       -n "$selfdir" \
       --no-session-persistence \
@@ -57,5 +63,5 @@ restart_flag="$selfdir/.clanker-restart-$$"
 # re-exec with the updated runner binary.
 if [ -f "$restart_flag" ]; then
   rm -f "$restart_flag"
-  exec "$self"
+  exec "$self" "$@"
 fi
