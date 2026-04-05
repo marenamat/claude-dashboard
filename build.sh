@@ -23,10 +23,11 @@ if [ ! -f "$BOOTSTRAP_DIR/css/bootstrap.min.css" ]; then
   echo "Downloading Bootstrap $BOOTSTRAP_VERSION..."
   mkdir -p "$BOOTSTRAP_DIR/css" "$BOOTSTRAP_DIR/js"
   BASE="https://cdn.jsdelivr.net/npm/bootstrap@${BOOTSTRAP_VERSION}/dist"
-  curl -sSfL "$BASE/css/bootstrap.min.css"     -o "$BOOTSTRAP_DIR/css/bootstrap.min.css"
-  curl -sSfL "$BASE/css/bootstrap.min.css.map" -o "$BOOTSTRAP_DIR/css/bootstrap.min.css.map"
-  curl -sSfL "$BASE/js/bootstrap.bundle.min.js"     -o "$BOOTSTRAP_DIR/js/bootstrap.bundle.min.js"
-  curl -sSfL "$BASE/js/bootstrap.bundle.min.js.map" -o "$BOOTSTRAP_DIR/js/bootstrap.bundle.min.js.map"
+  # --retry 3: retry up to 3 times on transient errors; --retry-connrefused: retry on ECONNREFUSED too
+  curl -sSfL --retry 3 --retry-connrefused "$BASE/css/bootstrap.min.css"     -o "$BOOTSTRAP_DIR/css/bootstrap.min.css"
+  curl -sSfL --retry 3 --retry-connrefused "$BASE/css/bootstrap.min.css.map" -o "$BOOTSTRAP_DIR/css/bootstrap.min.css.map"
+  curl -sSfL --retry 3 --retry-connrefused "$BASE/js/bootstrap.bundle.min.js"     -o "$BOOTSTRAP_DIR/js/bootstrap.bundle.min.js"
+  curl -sSfL --retry 3 --retry-connrefused "$BASE/js/bootstrap.bundle.min.js.map" -o "$BOOTSTRAP_DIR/js/bootstrap.bundle.min.js.map"
   echo "Bootstrap downloaded."
 else
   echo "Bootstrap already present, skipping download."

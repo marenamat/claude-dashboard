@@ -33,3 +33,15 @@ session_2026-04-05_fix:
 session_2026-04-05_nginx_ipv6:
   - nginx/dashboard.conf had IPv6 listen commented out, violating the project's
     mandatory IPv6 requirement. Fixed: enabled `listen [::]:8042;`.
+session_2026-04-05_ci_robustness:
+  - CI (run 24007632861) still failing on main after Rust fix b3b8938.
+  - Cannot obtain detailed logs via public API (no auth token).
+  - Code analysis: Rust code is correct; ciborium TryFrom<Integer> for i64/u64
+    IS implemented via implfrom! macro. Python script works locally.
+  - Improvements made (on issue-1-base-implementation branch):
+      1. Added actions/cache@v4 for ~/.cargo/registry to speed CI and reduce
+         transient download failures.
+      2. Added wasm-pack --version after install step for early validation.
+      3. Added --retry 3 --retry-connrefused to Bootstrap curl downloads to
+         handle transient CDN errors.
+  - Root cause remains unknown without CI logs; improvements should help.
