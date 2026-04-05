@@ -1,6 +1,9 @@
-recorded_at: '2026-04-05'
+recorded_at: '2026-04-05T20:20:00Z'
 branch: issue-2-separate-nginx
 status: complete
+ci_status:
+  main: failing (origin/main at 0bced95, wasm-pack still in CI — issue-1 not merged yet)
+  note: CI fix is in issue-1-base-implementation branch, will resolve on merge
 issues:
   - 1  # base implementation (CI fix on issue-1-base-implementation branch)
   - 2  # separate nginx from local machine (this branch)
