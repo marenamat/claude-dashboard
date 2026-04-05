@@ -20,5 +20,12 @@ summary: >
 outstanding:
   - Missing packages must be installed before build.sh can run (see claude/questions.md):
       rust toolchain + wasm32-unknown-unknown target, wasm-pack, python3-cbor2
-  - Local main (3a576a9) diverges from origin/main (5a0aafa, README update).
-    origin/main needs merging locally; human guardian handles this.
+maintenance_2026-04-05_session2:
+  - Rebased issue-1-base-implementation onto origin/main (da78bea).
+    The previous rebase failure was caused by unstaged context file changes
+    left by clanker-prep.  Committed them first, then rebased cleanly.
+  - Local main still diverges from origin/main (has 3a576a9 self-improvement
+    commit not on origin). Human guardian handles that.
+  - design/self-improvements.md deleted by origin/main (da78bea); now absent
+    from working tree after rebase.
+  - No open GitHub issues; no pipeline runs recorded.
