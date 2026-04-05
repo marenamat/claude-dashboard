@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Claude Dashboard</title>
+  <link rel="stylesheet" href="bootstrap/css/bootstrap.min.css">
+  <link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top">
+  <div class="container-fluid">
+    <span class="navbar-brand">Claude Dashboard</span>
+    <div class="collapse navbar-collapse">
+      <ul class="navbar-nav me-auto" id="project-nav">
+        {{NAV_ITEMS}}
+      </ul>
+      <span class="navbar-text small text-secondary" id="generated-at">
+        Generated: {{GENERATED_AT}}
+      </span>
+    </div>
+  </div>
+</nav>
+
+<main class="container-fluid py-4">
+
+  <noscript>
+    <div class="alert alert-info">JavaScript is disabled. Showing static data.</div>
+  </noscript>
+
+  <div id="dash-content">
+    {{PROJECT_SECTIONS}}
+  </div>
+
+</main>
+
+<script src="dashboard.js" defer></script>
+</body>
+</html>

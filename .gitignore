@@ -1,3 +1,12 @@
 __pycache__
 clanker.log
 clanker.lock
+
+# Generated web assets (not checked in, produced by build.sh / generate-data.py)
+www/data.cbor
+www/index.html
+www/bootstrap/
+www/pkg/
+
+# Rust build artefacts
+target/

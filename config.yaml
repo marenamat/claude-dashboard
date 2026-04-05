@@ -1,0 +1,7 @@
+# config.yaml — List of claude projects to include in the dashboard.
+# Each entry needs a path (absolute or ~-relative) and optionally a name.
+# If name is omitted, the directory basename is used.
+
+projects:
+  - path: ~/claude/claude-dashboard
+    name: claude-dashboard
