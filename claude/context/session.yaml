@@ -20,12 +20,13 @@ summary: >
 outstanding:
   - Missing packages must be installed before build.sh can run (see claude/questions.md):
       rust toolchain + wasm32-unknown-unknown target, wasm-pack, python3-cbor2
-maintenance_2026-04-05_session2:
-  - Rebased issue-1-base-implementation onto origin/main (da78bea).
-    The previous rebase failure was caused by unstaged context file changes
-    left by clanker-prep.  Committed them first, then rebased cleanly.
-  - Local main still diverges from origin/main (has 3a576a9 self-improvement
-    commit not on origin). Human guardian handles that.
-  - design/self-improvements.md deleted by origin/main (da78bea); now absent
-    from working tree after rebase.
-  - No open GitHub issues; no pipeline runs recorded.
+session_2026-04-05_fix:
+  - CI build was failing on main (run 24007256620).
+  - Root cause: src/lib.rs had two type errors in CBOR conversion helpers:
+      1. val_as_f64: `(*i).into()` tried Integer -> f64, which ciborium doesn't provide.
+         Fixed to use i64::try_from(*i).ok().map(|n| n as f64).
+      2. val_as_u64: manual i128 intermediate (`(*i).into()`) replaced with
+         u64::try_from(*i).ok() (cleaner and correct).
+  - Removed dead-code structs DashboardData / Run / Project and unused
+    `use serde::Deserialize` + serde dependency from Cargo.toml.
+  - Local main still diverges from origin/main; human guardian handles push.

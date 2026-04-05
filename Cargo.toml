@@ -10,8 +10,6 @@ crate-type = ["cdylib"]
 wasm-bindgen = "0.2"
 # CBOR parsing
 ciborium = "0.2"
-# Serialization helper
-serde = { version = "1", features = ["derive"] }
 
 [profile.release]
 # Minimise WASM binary size

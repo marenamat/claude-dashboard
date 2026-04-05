@@ -2,44 +2,7 @@
 // Receives CBOR data bytes from JS, renders the dashboard HTML.
 
 use wasm_bindgen::prelude::*;
-use serde::Deserialize;
 use std::collections::BTreeMap;
-
-// ---------------------------------------------------------------------------
-// Data model (mirrors generate-data.py output)
-// ---------------------------------------------------------------------------
-
-#[derive(Debug, Deserialize)]
-struct DashboardData {
-  generated_at: ciborium::tag::Required<String, 1>,
-  projects: Vec<Project>,
-}
-
-#[derive(Debug, Deserialize)]
-struct Project {
-  name: String,
-  path: String,
-  runs: Vec<Run>,
-}
-
-#[derive(Debug, Deserialize)]
-struct Run {
-  // CBOR timestamps come as tagged items; we accept as optional strings
-  #[serde(default)]
-  start: Option<String>,
-  #[serde(default)]
-  end: Option<String>,
-  #[serde(default)]
-  invoked: bool,
-  #[serde(default)]
-  cost_usd: Option<f64>,
-  #[serde(default)]
-  tokens_in: Option<u64>,
-  #[serde(default)]
-  tokens_out: Option<u64>,
-  #[serde(default)]
-  log: String,
-}
 
 // ---------------------------------------------------------------------------
 // CBOR deserialisation helpers
@@ -111,17 +74,16 @@ fn val_as_bool(map: &BTreeMap<String, ciborium::value::Value>, key: &str) -> boo
 fn val_as_f64(map: &BTreeMap<String, ciborium::value::Value>, key: &str) -> Option<f64> {
   match map.get(key)? {
     ciborium::value::Value::Float(f) => Some(*f),
-    ciborium::value::Value::Integer(i) => Some((*i).into()),
+    // ciborium::Integer has no Into<f64>; go via i64
+    ciborium::value::Value::Integer(i) => i64::try_from(*i).ok().map(|n| n as f64),
     _ => None,
   }
 }
 
 fn val_as_u64(map: &BTreeMap<String, ciborium::value::Value>, key: &str) -> Option<u64> {
   match map.get(key)? {
-    ciborium::value::Value::Integer(i) => {
-      let n: i128 = (*i).into();
-      if n >= 0 { Some(n as u64) } else { None }
-    }
+    // TryFrom<Integer> for u64 returns Err for negatives, which we want to drop
+    ciborium::value::Value::Integer(i) => u64::try_from(*i).ok(),
     _ => None,
   }
 }
