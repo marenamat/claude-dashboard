@@ -12,5 +12,13 @@ All of that separated per every project / claude instance.
 
 ## Nginx binding
 
-Prepare a set of configuration files to allow serving the dashboard via Nginx
-running on a different machine.
+Two-machine topology (issue #2):
+
+- **Clankers machine** (sysvinit, no systemd): runs a dedicated nginx instance
+  serving `www/` over plain HTTP on the local network (port 8042).
+  Managed by the sysvinit init script at `etc/init.d/claude-dashboard`.
+  Config: `nginx/clanker.conf`.
+
+- **Proxy machine**: runs nginx exposed to the internet, terminates HTTPS,
+  and reverse-proxies to the clankers machine over the local network.
+  Config: `nginx/proxy.conf` (drop into `/etc/nginx/sites-enabled/`).

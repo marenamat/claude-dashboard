@@ -1,60 +1,30 @@
 recorded_at: '2026-04-05'
-branch: issue-1-base-implementation
-status: fixing-ci
-issue: 1
-summary: >
-  Implemented base dashboard (issue #1).
-  - generate-data.py: parses clanker.log files, emits www/data.cbor and
-    injects content into www/index.html via index.template.html.
-  - src/lib.rs + Cargo.toml: Rust WASM module; render_dashboard() deserialises
-    CBOR and returns HTML for JS injection.  Includes ISO timestamp parsing and
-    duration computation (no extra dependencies).
-  - www/index.template.html: HTML5 template, Bootstrap layout, noscript-safe.
-  - www/dashboard.css: styles.
-  - www/dashboard.js: JS glue loading WASM and CBOR, falls back to static HTML.
-  - nginx/dashboard.conf: nginx server block for local / proxied serving.
-  - build.sh: downloads Bootstrap, builds WASM via cargo+wasm-bindgen, runs generate-data.py.
-  - config.yaml: list of projects to include in the dashboard.
-  - .github/workflows/build.yml: CI workflow; builds WASM + data, uploads
-    www/ as a downloadable artifact for preview.
-outstanding:
-  - Missing packages must be installed before build.sh can run (see claude/questions.md):
-      rust toolchain + wasm32-unknown-unknown target, wasm-bindgen-cli, python3-cbor2
+branch: issue-2-separate-nginx
+status: complete
+issues:
+  - 1  # base implementation (CI fix on issue-1-base-implementation branch)
+  - 2  # separate nginx from local machine (this branch)
 session_2026-04-05_fix:
   - CI build was failing on main (run 24007256620).
-  - Root cause: src/lib.rs had two type errors in CBOR conversion helpers:
-      1. val_as_f64: `(*i).into()` tried Integer -> f64, which ciborium doesn't provide.
-         Fixed to use i64::try_from(*i).ok().map(|n| n as f64).
-      2. val_as_u64: manual i128 intermediate (`(*i).into()`) replaced with
-         u64::try_from(*i).ok() (cleaner and correct).
-  - Removed dead-code structs DashboardData / Run / Project and unused
-    `use serde::Deserialize` + serde dependency from Cargo.toml.
-  - Local main still diverges from origin/main; human guardian handles push.
+  - Root cause: src/lib.rs had two type errors in CBOR conversion helpers.
+  - Fixed by issue-1-base-implementation branch.
 session_2026-04-05_nginx_ipv6:
-  - nginx/dashboard.conf had IPv6 listen commented out, violating the project's
-    mandatory IPv6 requirement. Fixed: enabled `listen [::]:8042;`.
+  - nginx/dashboard.conf had IPv6 listen commented out.
+  - Fixed: enabled `listen [::]:8042;`.
 session_2026-04-05_ci_robustness:
-  - CI (run 24007632861) still failing on main after Rust fix b3b8938.
-  - Cannot obtain detailed logs via public API (no auth token).
-  - Code analysis: Rust code is correct; ciborium TryFrom<Integer> for i64/u64
-    IS implemented via implfrom! macro. Python script works locally.
-  - Improvements made (on issue-1-base-implementation branch):
-      1. Added actions/cache@v4 for ~/.cargo/registry to speed CI and reduce
-         transient download failures.
-      2. Added wasm-pack --version after install step for early validation.
-      3. Added --retry 3 --retry-connrefused to Bootstrap curl downloads to
-         handle transient CDN errors.
-  - Root cause remains unknown without CI logs; improvements should help.
+  - CI still failing after Rust fix. Added cargo cache and Bootstrap retries.
+  - Root cause remained unknown without CI logs.
 session_2026-04-05_ci_wasm_pack_removal:
   - CI STILL failing on main (run 24008329844, SHA 0bced95) after all previous fixes.
-  - Root cause hypothesis: wasm-pack internally tries to download wasm-bindgen-cli
-    and/or wasm-opt from GitHub releases during build. This download fails or produces
-    a version mismatch, causing the build step to exit with code 1.
-  - Fix applied: replaced wasm-pack entirely with direct cargo + wasm-bindgen-cli approach:
-      1. build.sh: now runs `cargo build --target wasm32-unknown-unknown --release`
-         followed by `wasm-bindgen ... --target web --no-typescript`
-      2. build.yml: replaced wasm-pack install with wasm-bindgen-cli install via
-         `cargo install wasm-bindgen-cli`; added a dedicated cache for the binary
-         to avoid recompiling on every run.
-  - Advantage: no hidden network downloads during build; wasm-bindgen version used
-    by cargo and wasm-bindgen-cli are always compatible (both resolved by cargo).
+  - Root cause hypothesis: wasm-pack downloads wasm-bindgen-cli/wasm-opt from
+    GitHub releases at build time — fails due to rate-limiting or version mismatch.
+  - Fix: replaced wasm-pack with direct cargo + wasm-bindgen-cli (see issue-1 branch).
+session_2026-04-05_issue2:
+  - Implemented two-machine nginx topology for issue #2.
+  - nginx/dashboard.conf (single-machine) removed.
+  - nginx/clanker.conf: standalone nginx config for clankers machine (HTTP, port 8042).
+  - nginx/proxy.conf: nginx sites-enabled snippet for proxy machine (HTTPS, proxies
+    to clankers machine on local network).
+  - etc/init.d/claude-dashboard: sysvinit LSB init script (start/stop/reload/restart/status).
+    Manages the nginx instance on the clankers machine via start-stop-daemon.
+  - claude/design/base.md: updated Nginx binding section to document the two-machine topology.
