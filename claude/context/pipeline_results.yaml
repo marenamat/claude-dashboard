@@ -1,24 +1,36 @@
-fetched_at: '2026-04-05T18:30:00.481623+00:00'
+fetched_at: '2026-04-05T20:00:00.568438+00:00'
 repo: marenamat/claude-dashboard
 runs:
+- branch: main
+  conclusion: failure
+  created_at: '2026-04-05T19:03:01Z'
+  id: 24008329844
+  name: Build
+  status: completed
+- branch: main
+  conclusion: failure
+  created_at: '2026-04-05T18:50:27Z'
+  id: 24008110573
+  name: Build
+  status: completed
+- branch: main
+  conclusion: failure
+  created_at: '2026-04-05T18:49:58Z'
+  id: 24008101902
+  name: Build
+  status: completed
 - branch: main
   conclusion: failure
   created_at: '2026-04-05T18:22:48Z'
   id: 24007632861
   name: Build
   status: completed
-  notes: >
-    Build step failed in 10s on commit b3b8938 (Rust fix).
-    Root cause unknown (no log access). Likely transient CDN/network issue
-    or wasm-pack silently not installed. Added cargo caching + retry
-    + wasm-pack --version validation in fix commit on issue-1-base-implementation.
 - branch: main
   conclusion: failure
   created_at: '2026-04-05T18:12:09Z'
   id: 24007448049
   name: Deploy GitHub Pages
   status: completed
-  notes: Setup Pages step failed — GitHub Pages environment not configured.
 - branch: main
   conclusion: failure
   created_at: '2026-04-05T18:12:09Z'
@@ -31,4 +43,3 @@ runs:
   id: 24007256620
   name: Build
   status: completed
-  notes: Fixed by b3b8938 (remove serde, fix CBOR Integer conversions).

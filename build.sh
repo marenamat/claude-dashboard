@@ -3,10 +3,10 @@
 #
 # Steps:
 #   1. Download Bootstrap into www/bootstrap/ (if not present).
-#   2. Build the Rust WASM module via wasm-pack.
+#   2. Build the Rust WASM module via cargo + wasm-bindgen.
 #   3. Run generate-data.py to produce www/data.cbor and www/index.html.
 #
-# Prerequisites: rustup, wasm-pack, python3, cbor2 (pip install cbor2)
+# Prerequisites: rustup (with wasm32-unknown-unknown target), wasm-bindgen-cli, python3, cbor2 (pip install cbor2)
 
 set -euo pipefail
 
@@ -39,7 +39,10 @@ fi
 
 echo "Building WASM module..."
 cd "$SELFDIR"
-wasm-pack build --target web --release --out-dir www/pkg
+# Use cargo + wasm-bindgen directly (avoids wasm-pack's download of wasm-opt/wasm-bindgen-cli)
+cargo build --target wasm32-unknown-unknown --release
+wasm-bindgen target/wasm32-unknown-unknown/release/claude_dashboard.wasm \
+  --out-dir www/pkg --target web --no-typescript
 echo "WASM build done."
 
 # ---------------------------------------------------------------------------

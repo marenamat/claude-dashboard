@@ -1,6 +1,6 @@
 recorded_at: '2026-04-05'
 branch: issue-1-base-implementation
-status: complete
+status: fixing-ci
 issue: 1
 summary: >
   Implemented base dashboard (issue #1).
@@ -13,13 +13,13 @@ summary: >
   - www/dashboard.css: styles.
   - www/dashboard.js: JS glue loading WASM and CBOR, falls back to static HTML.
   - nginx/dashboard.conf: nginx server block for local / proxied serving.
-  - build.sh: downloads Bootstrap, runs wasm-pack, runs generate-data.py.
+  - build.sh: downloads Bootstrap, builds WASM via cargo+wasm-bindgen, runs generate-data.py.
   - config.yaml: list of projects to include in the dashboard.
   - .github/workflows/build.yml: CI workflow; builds WASM + data, uploads
     www/ as a downloadable artifact for preview.
 outstanding:
   - Missing packages must be installed before build.sh can run (see claude/questions.md):
-      rust toolchain + wasm32-unknown-unknown target, wasm-pack, python3-cbor2
+      rust toolchain + wasm32-unknown-unknown target, wasm-bindgen-cli, python3-cbor2
 session_2026-04-05_fix:
   - CI build was failing on main (run 24007256620).
   - Root cause: src/lib.rs had two type errors in CBOR conversion helpers:
@@ -45,3 +45,16 @@ session_2026-04-05_ci_robustness:
       3. Added --retry 3 --retry-connrefused to Bootstrap curl downloads to
          handle transient CDN errors.
   - Root cause remains unknown without CI logs; improvements should help.
+session_2026-04-05_ci_wasm_pack_removal:
+  - CI STILL failing on main (run 24008329844, SHA 0bced95) after all previous fixes.
+  - Root cause hypothesis: wasm-pack internally tries to download wasm-bindgen-cli
+    and/or wasm-opt from GitHub releases during build. This download fails or produces
+    a version mismatch, causing the build step to exit with code 1.
+  - Fix applied: replaced wasm-pack entirely with direct cargo + wasm-bindgen-cli approach:
+      1. build.sh: now runs `cargo build --target wasm32-unknown-unknown --release`
+         followed by `wasm-bindgen ... --target web --no-typescript`
+      2. build.yml: replaced wasm-pack install with wasm-bindgen-cli install via
+         `cargo install wasm-bindgen-cli`; added a dedicated cache for the binary
+         to avoid recompiling on every run.
+  - Advantage: no hidden network downloads during build; wasm-bindgen version used
+    by cargo and wasm-bindgen-cli are always compatible (both resolved by cargo).

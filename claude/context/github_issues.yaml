@@ -1,5 +1,20 @@
-fetched_at: '2026-04-05T18:30:00.481623+00:00'
+fetched_at: '2026-04-05T20:00:00.568438+00:00'
 issues:
+- author: marenamat
+  body: 'The topology is like this:
+
+
+    - clankers run on a dedicated machine, they should expose an endpoint serving
+    the dashboard; that machine has sysvinit, no systemd, create a service using init
+    scripts
+
+    - nginx runs on another machine, it should expose the dashboard via HTTPS, and
+    must connect to clankers machine through local network'
+  comments: []
+  created_at: '2026-04-05T18:30:52Z'
+  labels: []
+  number: 2
+  title: Separate nginx from the local machine
 - author: marenamat
   body: Do it.
   comments: []

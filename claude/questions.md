@@ -14,18 +14,12 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 rustup target add wasm32-unknown-unknown
 ```
 
-### wasm-pack
+### wasm-bindgen-cli
 
-Needed for building and packaging the Rust WASM module.
-
-```
-curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-```
-
-Or via cargo once Rust is installed:
+Needed for generating JS bindings from the compiled WASM module.
 
 ```
-cargo install wasm-pack
+cargo install wasm-bindgen-cli
 ```
 
 ### Python cbor2

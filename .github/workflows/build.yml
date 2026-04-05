@@ -30,10 +30,22 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
-      - name: Install wasm-pack
+      - name: Cache wasm-bindgen-cli binary
+        id: cache-wasm-bindgen
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/wasm-bindgen
+            ~/.cargo/bin/wasm-bindgen-test-runner
+            ~/.cargo/.crates.toml
+            ~/.cargo/.crates2.json
+          key: ${{ runner.os }}-wasm-bindgen-${{ hashFiles('Cargo.toml') }}
+
+      - name: Install wasm-bindgen-cli
+        if: steps.cache-wasm-bindgen.outputs.cache-hit != 'true'
         run: |
-          curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-          wasm-pack --version
+          cargo install wasm-bindgen-cli
+          wasm-bindgen --version
 
       - name: Install Python dependencies
         run: pip install cbor2 pyyaml
