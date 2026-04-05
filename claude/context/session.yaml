@@ -30,3 +30,6 @@ session_2026-04-05_fix:
   - Removed dead-code structs DashboardData / Run / Project and unused
     `use serde::Deserialize` + serde dependency from Cargo.toml.
   - Local main still diverges from origin/main; human guardian handles push.
+session_2026-04-05_nginx_ipv6:
+  - nginx/dashboard.conf had IPv6 listen commented out, violating the project's
+    mandatory IPv6 requirement. Fixed: enabled `listen [::]:8042;`.
