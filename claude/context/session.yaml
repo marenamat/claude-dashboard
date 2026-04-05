@@ -1,12 +1,17 @@
-recorded_at: '2026-04-05T20:20:00Z'
+recorded_at: '2026-04-05T21:00:00Z'
 branch: issue-2-separate-nginx
 status: complete
 ci_status:
-  main: failing (origin/main at 0bced95, wasm-pack still in CI — issue-1 not merged yet)
-  note: CI fix is in issue-1-base-implementation branch, will resolve on merge
+  main: failing (origin/main at 0bced95, wasm-pack still in CI — issue-1/issue-2 not merged yet)
+  note: CI fix is in this branch; will resolve on merge
 issues:
-  - 1  # base implementation (CI fix on issue-1-base-implementation branch)
-  - 2  # separate nginx from local machine (this branch)
+  - 1  # base implementation (done)
+  - 2  # separate nginx from local machine (done)
+deployment:
+  status: workflow added (deploy.yml)
+  note: GitHub Pages must be enabled by human guardian — see claude/questions.md
+  main_url: https://marenamat.github.io/claude-dashboard/
+  branch_url: https://marenamat.github.io/claude-dashboard/preview/<branch>/
 session_2026-04-05_fix:
   - CI build was failing on main (run 24007256620).
   - Root cause: src/lib.rs had two type errors in CBOR conversion helpers.
@@ -19,9 +24,9 @@ session_2026-04-05_ci_robustness:
   - Root cause remained unknown without CI logs.
 session_2026-04-05_ci_wasm_pack_removal:
   - CI STILL failing on main (run 24008329844, SHA 0bced95) after all previous fixes.
-  - Root cause hypothesis: wasm-pack downloads wasm-bindgen-cli/wasm-opt from
-    GitHub releases at build time — fails due to rate-limiting or version mismatch.
-  - Fix: replaced wasm-pack with direct cargo + wasm-bindgen-cli (see issue-1 branch).
+  - Root cause: wasm-pack downloads wasm-bindgen-cli/wasm-opt from GitHub releases
+    at build time — fails due to rate-limiting or version mismatch.
+  - Fix: replaced wasm-pack with direct cargo + wasm-bindgen-cli (see this branch).
 session_2026-04-05_issue2:
   - Implemented two-machine nginx topology for issue #2.
   - nginx/dashboard.conf (single-machine) removed.
@@ -31,3 +36,8 @@ session_2026-04-05_issue2:
   - etc/init.d/claude-dashboard: sysvinit LSB init script (start/stop/reload/restart/status).
     Manages the nginx instance on the clankers machine via start-stop-daemon.
   - claude/design/base.md: updated Nginx binding section to document the two-machine topology.
+session_2026-04-05_deploy:
+  - Added .github/workflows/deploy.yml for branch preview deployments.
+  - Deploys main to gh-pages root; other branches to gh-pages/preview/<branch>/.
+  - Fixed stale nginx/dashboard.conf reference in build.sh.
+  - GitHub Pages needs to be enabled by human guardian (see claude/questions.md).

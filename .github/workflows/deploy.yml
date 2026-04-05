@@ -1,0 +1,118 @@
+# deploy.yml — Build and deploy to GitHub Pages on every push.
+#
+# main    → https://marenamat.github.io/claude-dashboard/
+# others  → https://marenamat.github.io/claude-dashboard/preview/<branch>/
+#
+# Prerequisites: GitHub Pages must be enabled on the repo (source: gh-pages branch, / root).
+# See claude/questions.md for setup instructions.
+
+name: Deploy
+
+on:
+  push:
+
+permissions:
+  contents: write
+
+# Serialize deploys per branch to avoid gh-pages race conditions.
+concurrency:
+  group: deploy-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Cache wasm-bindgen-cli binary
+        id: cache-wasm-bindgen
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/wasm-bindgen
+            ~/.cargo/bin/wasm-bindgen-test-runner
+            ~/.cargo/.crates.toml
+            ~/.cargo/.crates2.json
+          key: ${{ runner.os }}-wasm-bindgen-${{ hashFiles('Cargo.toml') }}
+
+      - name: Install wasm-bindgen-cli
+        if: steps.cache-wasm-bindgen.outputs.cache-hit != 'true'
+        run: |
+          cargo install wasm-bindgen-cli
+          wasm-bindgen --version
+
+      - name: Install Python dependencies
+        run: pip install cbor2 pyyaml
+
+      - name: Build
+        run: ./build.sh
+
+      - name: Deploy to gh-pages
+        run: |
+          BRANCH="${GITHUB_REF_NAME}"
+          SHA="${GITHUB_SHA}"
+
+          # Sanitize branch name: replace characters that are not alphanumeric, dot, dash, underscore
+          SAFE_BRANCH=$(printf '%s' "$BRANCH" | tr -cs 'a-zA-Z0-9._-' '-')
+
+          if [ "$BRANCH" = "main" ]; then
+            TARGET_DIR="."
+          else
+            TARGET_DIR="preview/$SAFE_BRANCH"
+          fi
+
+          # Configure git identity for CI commit
+          git config user.email "ci-deploy@github.com"
+          git config user.name "GitHub Actions"
+
+          # Fetch or create the gh-pages branch
+          if git fetch origin gh-pages; then
+            git checkout gh-pages
+          else
+            git checkout --orphan gh-pages
+            git rm -rf . 2>/dev/null || true
+            touch .nojekyll
+            git add .nojekyll
+            git commit -m "init: create gh-pages branch"
+          fi
+
+          # Install built files into target directory
+          if [ "$TARGET_DIR" = "." ]; then
+            # For main: overwrite root files, preserve preview/ subdirectory
+            find . -maxdepth 1 -not -name '.' -not -name '.git' -not -name 'preview' -not -name '.nojekyll' \
+              -exec rm -rf {} +
+            cp -r "$GITHUB_WORKSPACE/www/." .
+          else
+            rm -rf "$TARGET_DIR"
+            mkdir -p "$(dirname "$TARGET_DIR")"
+            cp -r "$GITHUB_WORKSPACE/www" "$TARGET_DIR"
+          fi
+
+          # Ensure Jekyll is skipped
+          touch .nojekyll
+
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Nothing to deploy."
+          else
+            git commit -m "deploy: $BRANCH @ ${SHA:0:8}"
+            git push origin gh-pages
+          fi

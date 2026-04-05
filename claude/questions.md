@@ -1,5 +1,21 @@
 # Questions / Dependency Requests
 
+## GitHub Pages setup required for branch preview deployments
+
+The `deploy.yml` workflow deploys built output to the `gh-pages` branch so
+every branch gets a preview URL (CLAUDE.md requirement). This requires one
+manual step:
+
+Enable GitHub Pages on the repo:
+- Go to https://github.com/marenamat/claude-dashboard/settings/pages
+- Source: **Deploy from a branch**
+- Branch: **gh-pages**, folder: **/ (root)**
+- Save
+
+After that, on every push:
+- `main` → `https://marenamat.github.io/claude-dashboard/`
+- other branches → `https://marenamat.github.io/claude-dashboard/preview/<branch>/`
+
 ## Required packages for issue-1 (Base implementation)
 
 The dashboard implementation requires the following packages not currently
