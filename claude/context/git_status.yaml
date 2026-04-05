@@ -1,9 +1,5 @@
 branches:
-- issue-1-claude-run-script
 - main
 maintenance_actions:
 - fetched
-- main fast-forwarded
-- 'rebased: issue-1-claude-run-script'
-- 'pruned: issue-1-claude-run-script'
-recorded_at: '2026-04-05T16:40:00.336238+00:00'
+recorded_at: '2026-04-05T17:20:49.238008+00:00'

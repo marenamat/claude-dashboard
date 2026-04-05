@@ -98,6 +98,11 @@ def do_git_maintenance():
     if branches:
         current, _, _ = run("git branch --show-current")
         for branch in branches:
+            # Skip if origin/main is already an ancestor (branch is up to date)
+            _, _, ancestor_rc = run(f"git merge-base --is-ancestor origin/main {branch}")
+            if ancestor_rc == 0:
+                actions.append(f"up-to-date: {branch}")
+                continue
             run(f"git checkout {branch}")
             _, err, rc = run("git rebase origin/main")
             if rc != 0:
