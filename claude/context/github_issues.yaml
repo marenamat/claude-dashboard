@@ -1,25 +1,3 @@
-fetched_at: '2026-04-06T07:40:00.162042+00:00'
-issues:
-- author: marenamat
-  body: 'The topology is like this:
-
-
-    - clankers run on a dedicated machine, they should expose an endpoint serving
-    the dashboard; that machine has sysvinit, no systemd, create a service using init
-    scripts
-
-    - nginx runs on another machine, it should expose the dashboard via HTTPS, and
-    must connect to clankers machine through local network'
-  comments: []
-  created_at: '2026-04-05T18:30:52Z'
-  labels: []
-  number: 2
-  title: Separate nginx from the local machine
-- author: marenamat
-  body: Do it.
-  comments: []
-  created_at: '2026-04-05T17:27:01Z'
-  labels: []
-  number: 1
-  title: Base implementation
+fetched_at: '2026-04-06T11:00:00.518080+00:00'
+issues: []
 repo: marenamat/claude-dashboard

@@ -66,8 +66,34 @@ jobs:
       - name: Install Python dependencies
         run: pip install cbor2 pyyaml
 
-      - name: Build
-        run: ./build.sh
+      - name: Download Bootstrap
+        run: |
+          WWW=www
+          BOOTSTRAP_VERSION="5.3.3"
+          BOOTSTRAP_DIR="$WWW/bootstrap"
+          if [ ! -f "$BOOTSTRAP_DIR/css/bootstrap.min.css" ]; then
+            echo "Downloading Bootstrap $BOOTSTRAP_VERSION..."
+            mkdir -p "$BOOTSTRAP_DIR/css" "$BOOTSTRAP_DIR/js"
+            BASE="https://cdn.jsdelivr.net/npm/bootstrap@${BOOTSTRAP_VERSION}/dist"
+            curl -sSfL --retry 3 --retry-connrefused "$BASE/css/bootstrap.min.css"     -o "$BOOTSTRAP_DIR/css/bootstrap.min.css"
+            curl -sSfL --retry 3 --retry-connrefused "$BASE/css/bootstrap.min.css.map" -o "$BOOTSTRAP_DIR/css/bootstrap.min.css.map"
+            curl -sSfL --retry 3 --retry-connrefused "$BASE/js/bootstrap.bundle.min.js"     -o "$BOOTSTRAP_DIR/js/bootstrap.bundle.min.js"
+            curl -sSfL --retry 3 --retry-connrefused "$BASE/js/bootstrap.bundle.min.js.map" -o "$BOOTSTRAP_DIR/js/bootstrap.bundle.min.js.map"
+            echo "Bootstrap downloaded."
+          else
+            echo "Bootstrap already present."
+          fi
+
+      - name: Cargo build WASM
+        run: cargo build --target wasm32-unknown-unknown --release
+
+      - name: wasm-bindgen
+        run: |
+          wasm-bindgen target/wasm32-unknown-unknown/release/claude_dashboard.wasm \
+            --out-dir www/pkg --target web --no-typescript
+
+      - name: Generate dashboard data
+        run: python3 generate-data.py
 
       - name: Upload dashboard artifact
         uses: actions/upload-artifact@v4

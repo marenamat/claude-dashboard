@@ -1,5 +1,18 @@
 # Questions / Dependency Requests
 
+## CI Build failures — need log access
+
+The Build and Deploy workflows are still failing after all CI fixes (wasm-bindgen-cli
+approach, exact version pinning). The CI step "Build" (`./build.sh`) fails but we
+cannot see the actual error because the GitHub API returns 403 on log downloads.
+
+CI was split into discrete sub-steps (Bootstrap download, Cargo build WASM,
+wasm-bindgen, Generate dashboard data) so the next CI run will show exactly which
+sub-step fails. Please check the failing step in the next CI run and report back.
+
+Alternatively, please grant the workflow logs read access by checking if the GitHub
+token has the `actions: read` permission, or share the relevant step's output.
+
 ## GitHub Pages setup required for branch preview deployments
 
 The `deploy.yml` workflow deploys built output to the `gh-pages` branch so
