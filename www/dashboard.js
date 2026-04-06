@@ -7,7 +7,7 @@
   // Paths relative to the page location
   const DATA_URL = "data.cbor";
   const WASM_URL = "pkg/claude_dashboard_bg.wasm";
-  const JS_URL   = "pkg/claude_dashboard.js";
+  const JS_URL   = "./pkg/claude_dashboard.js";
 
   const content = document.getElementById("dash-content");
 
