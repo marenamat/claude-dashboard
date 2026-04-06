@@ -203,15 +203,19 @@ def sync_claude_md():
 
 def do_template_merge():
     """
-    If a 'claude-base' remote is configured, selectively sync base-owned
-    files from the upstream template into main. Returns list of action strings.
+    If a 'claude-base' remote is configured, sync base-owned files from the
+    upstream template into main using a proper merge commit.  The merge commit
+    records claude-base/main as a second parent so the exact upstream commit
+    ID is preserved in project history.
 
-    Rather than a full git merge (which would conflict with project-specific
-    changes), this function:
-      - reads .claude-base-files for the list of verbatim-sync files,
-      - checks them out from claude-base/main one by one, and
-      - runs sync_claude_md() to update the [CLAUDE-BASE BEGIN/END] section
-        inside CLAUDE.md without touching project-specific content below it.
+    Strategy:
+      - git merge --no-ff --no-commit --allow-unrelated-histories -s ours
+        sets up the merge state without touching any local files.
+        (--allow-unrelated-histories is required for repos created via
+        "Use this template", which have no shared git history with claude-base.)
+      - Selected files are then checked out from claude-base/main.
+      - CLAUDE.md gets smart-merged (preserves the project-specific section).
+      - A single merge commit finalises the merge and records both parents.
 
     To opt in, add the remote:
         git remote add claude-base https://github.com/marenamat/claude-base.git
@@ -243,9 +247,22 @@ def do_template_merge():
         actions.append("template_up_to_date")
         return actions
 
-    # Switch to main for the sync
+    # Switch to main for the merge
     current, _, _ = run("git branch --show-current")
     run("git checkout main")
+
+    # Set up the merge state using 'ours' strategy so our tree stays intact.
+    # --no-commit lets us stage the actual file changes before finalising.
+    _, err, rc = run(
+        "git merge --no-ff --no-commit --allow-unrelated-histories -s ours claude-base/main 2>&1"
+    )
+    if rc != 0:
+        print(f"Template merge setup failed: {err}", file=sys.stderr)
+        run("git merge --abort")
+        actions.append(f"template_merge_failed: {err}")
+        if current and current != "main":
+            run(f"git checkout {current}")
+        return actions
 
     # Determine which files to sync verbatim.
     # .claude-base-files itself is always in the list so it self-updates.
@@ -267,7 +284,7 @@ def do_template_merge():
         if rc == 0:
             synced.append(f)
         else:
-            # File may not exist in upstream — skip silently unless unexpected
+            # File may not exist in upstream — skip silently
             failed.append(f"{f}: {err.strip()}")
 
     if failed:
@@ -277,27 +294,21 @@ def do_template_merge():
     if sync_claude_md():
         synced.append("CLAUDE.md")
 
-    if synced:
-        # Check if anything is actually staged (files may have been identical)
-        staged, _, _ = run("git diff --cached --name-only")
-        if staged.strip():
-            updated = ', '.join(synced)
-            msg = (
-                f"chore: sync {len(synced)} file(s) from claude-base template\n\n"
-                f"Updated: {updated}\n\n"
-                "Workflow authored by Maria Matejka <vibecoding@jmq.cz>"
-            )
-            _, err, rc = run(f'git commit -m "{msg}" 2>&1')
-            if rc == 0:
-                actions.append(f"template_synced: {', '.join(synced)}")
-            else:
-                run("git reset HEAD -- .")
-                actions.append(f"template_commit_failed: {err}")
-                print(f"Template commit failed: {err}", file=sys.stderr)
-        else:
-            actions.append("template_no_changes")
+    # Finalise the merge commit.  Even when no files changed we still commit
+    # so the merge parent (and thus the upstream commit ID) is recorded.
+    updated = ', '.join(synced) if synced else "no file changes"
+    msg = (
+        f"chore: merge claude-base template ({len(synced)} file(s) updated)\n\n"
+        f"Updated: {updated}\n\n"
+        "Workflow authored by Maria Matejka <vibecoding@jmq.cz>"
+    )
+    _, err, rc = run(f'git commit --no-edit -m "{msg}" 2>&1')
+    if rc == 0:
+        actions.append(f"template_merged: {updated}")
     else:
-        actions.append("template_no_changes")
+        run("git merge --abort")
+        actions.append(f"template_commit_failed: {err}")
+        print(f"Template merge commit failed: {err}", file=sys.stderr)
 
     if current and current != "main":
         run(f"git checkout {current}")
