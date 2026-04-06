@@ -1,6 +1,33 @@
-fetched_at: '2026-04-06T11:40:00.575536+00:00'
+fetched_at: '2026-04-06T16:25:01.079597+00:00'
 repo: marenamat/claude-dashboard
+notes: >
+  All failures traced to src/lib.rs:308 — raw string r#"..."#  terminated early
+  by href="#proj-..." which contains "# inside.  Fixed by switching to r##"..."##.
 runs:
+- branch: main
+  conclusion: failure
+  created_at: '2026-04-06T12:33:32Z'
+  id: 24031955101
+  name: Build
+  status: completed
+- branch: main
+  conclusion: failure
+  created_at: '2026-04-06T12:33:32Z'
+  id: 24031955097
+  name: Deploy
+  status: completed
+- branch: main
+  conclusion: failure
+  created_at: '2026-04-06T11:51:31Z'
+  id: 24030726974
+  name: Deploy
+  status: completed
+- branch: main
+  conclusion: failure
+  created_at: '2026-04-06T11:51:31Z'
+  id: 24030726945
+  name: Build
+  status: completed
 - branch: main
   conclusion: failure
   created_at: '2026-04-06T11:31:23Z'

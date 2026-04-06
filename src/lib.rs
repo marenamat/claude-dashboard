@@ -305,7 +305,7 @@ pub fn render_dashboard(cbor_bytes: &[u8]) -> String {
     Ok((generated_at, projects)) => {
       let sections: String = projects.iter().map(render_project).collect();
       let nav: String = projects.iter().map(|p|
-        format!(r#"<li class="nav-item"><a class="nav-link" href="#proj-{id}">{name}</a></li>"#,
+        format!(r##"<li class="nav-item"><a class="nav-link" href="#proj-{id}">{name}</a></li>"##,
           id = esc(&p.name), name = esc(&p.name))
       ).collect();
       format!(
