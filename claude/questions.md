@@ -13,6 +13,56 @@ sub-step fails. Please check the failing step in the next CI run and report back
 Alternatively, please grant the workflow logs read access by checking if the GitHub
 token has the `actions: read` permission, or share the relevant step's output.
 
+```
+
+8s
+Run ./build.sh
+Downloading Bootstrap 5.3.3...
+Bootstrap downloaded.
+Building WASM module...
+ Downloading crates ...
+  Downloaded ciborium-ll v0.2.2
+  Downloaded rustversion v1.0.22
+  Downloaded ciborium-io v0.2.2
+  Downloaded wasm-bindgen-macro v0.2.117
+  Downloaded half v2.7.1
+  Downloaded ciborium v0.2.2
+  Downloaded wasm-bindgen v0.2.117
+  Downloaded wasm-bindgen-macro-support v0.2.117
+  Downloaded bumpalo v3.20.2
+  Downloaded zerocopy-derive v0.8.48
+   Compiling proc-macro2 v1.0.106
+   Compiling unicode-ident v1.0.24
+   Compiling quote v1.0.45
+   Compiling wasm-bindgen-shared v0.2.117
+   Compiling rustversion v1.0.22
+   Compiling zerocopy v0.8.48
+   Compiling serde_core v1.0.228
+   Compiling cfg-if v1.0.4
+   Compiling bumpalo v3.20.2
+   Compiling serde v1.0.228
+   Compiling wasm-bindgen v0.2.117
+   Compiling syn v2.0.117
+   Compiling ciborium-io v0.2.2
+   Compiling once_cell v1.21.4
+   Compiling wasm-bindgen-macro-support v0.2.117
+   Compiling zerocopy-derive v0.8.48
+   Compiling serde_derive v1.0.228
+   Compiling wasm-bindgen-macro v0.2.117
+   Compiling half v2.7.1
+   Compiling ciborium-ll v0.2.2
+   Compiling ciborium v0.2.2
+   Compiling claude-dashboard v0.1.0 (/home/runner/work/claude-dashboard/claude-dashboard)
+error: expected `,`, found `-`
+   --> src/lib.rs:308:72
+    |
+308 |         format!(r#"<li class="nav-item"><a class="nav-link" href="#proj-{id}">{name}</a></li>"#,
+    |                                                                        ^ expected `,`
+
+error: could not compile `claude-dashboard` (lib) due to 1 previous error
+Error: Process completed with exit code 101.
+```
+
 ## GitHub Pages setup — RESOLVED
 
 Updated `deploy.yml` to use GitHub Actions Pages deployment (`actions/deploy-pages`).
