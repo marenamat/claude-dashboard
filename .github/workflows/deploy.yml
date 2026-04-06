@@ -42,6 +42,10 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
+      # Generate lock file so we can pin wasm-bindgen-cli to the exact crate version.
+      - name: Generate Cargo.lock
+        run: cargo generate-lockfile
+
       - name: Cache wasm-bindgen-cli binary
         id: cache-wasm-bindgen
         uses: actions/cache@v4
@@ -51,12 +55,24 @@ jobs:
             ~/.cargo/bin/wasm-bindgen-test-runner
             ~/.cargo/.crates.toml
             ~/.cargo/.crates2.json
-          key: ${{ runner.os }}-wasm-bindgen-${{ hashFiles('Cargo.toml') }}
+          key: ${{ runner.os }}-wasm-bindgen-${{ hashFiles('Cargo.lock') }}
 
       - name: Install wasm-bindgen-cli
         if: steps.cache-wasm-bindgen.outputs.cache-hit != 'true'
         run: |
-          cargo install wasm-bindgen-cli
+          # Install the exact version that cargo resolved for the wasm-bindgen crate
+          # to avoid "version mismatch" errors at link time.
+          WASM_BINDGEN_VERSION=$(python3 -c "
+          import re, sys
+          content = open('Cargo.lock').read()
+          m = re.search(r'\[\[package\]\]\nname = \"wasm-bindgen\"\nversion = \"([^\"]+)\"', content)
+          if not m:
+              print('ERROR: wasm-bindgen not found in Cargo.lock', file=sys.stderr)
+              sys.exit(1)
+          print(m.group(1))
+          ")
+          echo "Installing wasm-bindgen-cli==$WASM_BINDGEN_VERSION"
+          cargo install wasm-bindgen-cli --version "$WASM_BINDGEN_VERSION"
           wasm-bindgen --version
 
       - name: Install Python dependencies

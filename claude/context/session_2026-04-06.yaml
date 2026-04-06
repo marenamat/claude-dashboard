@@ -1,0 +1,26 @@
+date: '2026-04-06'
+branch: issue-2-separate-nginx
+
+summary: |
+  Maintenance + CI fix session.
+
+  Status:
+  - issue-1 (base implementation): complete, code merged to local main
+  - issue-2 (separate nginx): complete; nginx/clanker.conf, nginx/proxy.conf,
+    etc/init.d/claude-dashboard all in place
+  - Both issues awaiting push to remote by human guardian
+
+  Pipeline failures (all pre-2026-04-06):
+  - All 7 known failures are from old wasm-pack CI workflow
+  - Current code replaced wasm-pack with cargo + wasm-bindgen-cli (commit 7d5b1e8)
+  - That fix was never pushed to remote, so no new CI run has been triggered
+
+  Fix applied this session:
+  - .github/workflows/build.yml: add "cargo generate-lockfile" step, use
+    Cargo.lock hash as cache key, install wasm-bindgen-cli at exact version
+    matching the crate (via Cargo.lock regex extraction)
+  - .github/workflows/deploy.yml: same fix
+
+  Git status:
+  - local main diverges from remote main (clanker-prep ff failed)
+  - issue-2-separate-nginx is at same commit as local main (no branch-specific commits)
