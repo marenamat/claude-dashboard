@@ -13,6 +13,16 @@ dirdd=${dirxx//\//__}
 git config --local user.name "Claude Worker by Maria"
 git config --local user.email "vibecoding@jmq.cz"
 
+# Optional: if this repo is a fork of claude-base, add the upstream remote
+# so clanker-prep can auto-sync base-owned files (clanker scripts, etc.)
+# without stomping over your project-specific changes.
+#
+#   git remote add claude-base https://github.com/marenamat/claude-base.git
+#
+# Once added, clanker-prep will periodically fetch and apply upstream changes
+# to the files listed in .claude-base-files, and update the [CLAUDE-BASE BEGIN/END]
+# section of CLAUDE.md while preserving your project-specific additions below it.
+
 if which systemctl >/dev/null; then
 
   systemd=$HOME/.config/systemd/user/

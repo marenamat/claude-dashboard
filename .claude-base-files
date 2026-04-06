@@ -1,0 +1,14 @@
+# Files owned by the claude-base template.
+# These are synced verbatim from upstream when a fork runs do_template_merge().
+# Edit this list if your fork intentionally diverges from a base file
+# (remove that line), or to receive new base files added upstream (add a line).
+#
+# CLAUDE.md is NOT listed here — it is handled separately via
+# [CLAUDE-BASE BEGIN]/[CLAUDE-BASE END] markers to preserve your
+# project-specific additions.
+
+clanker
+clanker-prep
+clanker-run
+clanker-setup
+.claude-base-files

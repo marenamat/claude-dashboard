@@ -1,3 +1,4 @@
+# [CLAUDE-BASE BEGIN]
 # General
 
 - No linkedin bullshit, no complicated messages.
@@ -127,3 +128,7 @@ the design documents accordingly.
   Authors"
 - If a whole block of code is completely deleted and that person has no
   other contribution, move them to "Authors of Code No Longer Here"
+# [CLAUDE-BASE END]
+
+# Project-specific rules
+# (add your project-specific Claude instructions below this line)

@@ -157,10 +157,69 @@ def do_git_maintenance():
     return actions
 
 
+def sync_claude_md():
+    """
+    Smart-merge upstream CLAUDE.md into local CLAUDE.md.
+    Replaces the [CLAUDE-BASE BEGIN]..[CLAUDE-BASE END] section with the
+    version from claude-base/main while preserving any project-specific
+    content that follows the END marker.
+    Returns True if CLAUDE.md was written (changed or created).
+    """
+    BEGIN = "# [CLAUDE-BASE BEGIN]"
+    END   = "# [CLAUDE-BASE END]"
+
+    # Get upstream CLAUDE.md text
+    upstream_raw, _, rc = run("git show claude-base/main:CLAUDE.md")
+    if rc != 0:
+        return False  # No CLAUDE.md in upstream — nothing to do
+
+    # Extract the base section from upstream.
+    # If upstream already has the markers, grab only that section.
+    # Otherwise treat the entire upstream file as the base section.
+    if BEGIN in upstream_raw and END in upstream_raw:
+        start = upstream_raw.index(BEGIN)
+        end   = upstream_raw.index(END) + len(END)
+        base_block = upstream_raw[start:end]
+    else:
+        base_block = f"{BEGIN}\n{upstream_raw.rstrip()}\n{END}"
+
+    # Read local CLAUDE.md to find any project-specific section.
+    local_path = Path("CLAUDE.md")
+    if local_path.exists():
+        local_raw = local_path.read_text()
+        if END in local_raw:
+            # Preserve everything after the END marker
+            tail = local_raw[local_raw.index(END) + len(END):]
+        else:
+            # No markers yet — wrap existing content as project-specific
+            tail = f"\n\n{local_raw}" if local_raw.strip() else ""
+    else:
+        tail = "\n\n# Project-specific rules\n# (add your project-specific Claude instructions below this line)\n"
+
+    new_content = base_block + tail
+
+    if local_path.exists() and local_path.read_text() == new_content:
+        return False  # Nothing changed
+
+    local_path.write_text(new_content)
+    run("git add CLAUDE.md")
+    return True
+
+
 def do_template_merge():
     """
-    If a 'claude-base' remote is configured, fetch it and merge new commits
-    from the upstream template into main. Returns list of action strings.
+    If a 'claude-base' remote is configured, selectively sync base-owned
+    files from the upstream template into main. Returns list of action strings.
+
+    Rather than a full git merge (which would conflict with project-specific
+    changes), this function:
+      - reads .claude-base-files for the list of verbatim-sync files,
+      - checks them out from claude-base/main one by one, and
+      - runs sync_claude_md() to update the [CLAUDE-BASE BEGIN/END] section
+        inside CLAUDE.md without touching project-specific content below it.
+
+    To opt in, add the remote:
+        git remote add claude-base https://github.com/marenamat/claude-base.git
     """
     actions = []
 
@@ -178,27 +237,73 @@ def do_template_merge():
     actions.append("template_fetched")
 
     # Resolve template's main branch
-    template_head, _, rc = run("git rev-parse claude-base/main")
+    _, _, rc = run("git rev-parse claude-base/main")
     if rc != 0:
         actions.append("template_no_main_branch")
         return actions
 
     # Skip if template is already an ancestor of local main
-    _, _, rc = run(f"git merge-base --is-ancestor claude-base/main main")
+    _, _, rc = run("git merge-base --is-ancestor claude-base/main main")
     if rc == 0:
         actions.append("template_up_to_date")
         return actions
 
-    # New template commits — try to merge into main
+    # Switch to main for the sync
     current, _, _ = run("git branch --show-current")
     run("git checkout main")
-    _, err, rc = run("git merge --no-edit claude-base/main 2>&1")
-    if rc == 0:
-        actions.append("template_merged")
+
+    # Determine which files to sync verbatim.
+    # .claude-base-files itself is always in the list so it self-updates.
+    base_files_path = Path(".claude-base-files")
+    if base_files_path.exists():
+        file_list = [
+            line.strip()
+            for line in base_files_path.read_text().splitlines()
+            if line.strip() and not line.strip().startswith("#")
+        ]
     else:
-        run("git merge --abort 2>/dev/null || true")
-        actions.append(f"template_merge_failed: {err}")
-        print(f"Template merge failed: {err}", file=sys.stderr)
+        file_list = ["clanker", "clanker-prep", "clanker-run", "clanker-setup", ".claude-base-files"]
+
+    synced = []
+    failed = []
+
+    for f in file_list:
+        _, err, rc = run(f"git checkout claude-base/main -- {f} 2>&1")
+        if rc == 0:
+            synced.append(f)
+        else:
+            # File may not exist in upstream — skip silently unless unexpected
+            failed.append(f"{f}: {err.strip()}")
+
+    if failed:
+        print(f"Template sync skipped files: {failed}", file=sys.stderr)
+
+    # Smart-merge CLAUDE.md (preserves project-specific section)
+    if sync_claude_md():
+        synced.append("CLAUDE.md")
+
+    if synced:
+        # Check if anything is actually staged (files may have been identical)
+        staged, _, _ = run("git diff --cached --name-only")
+        if staged.strip():
+            updated = ', '.join(synced)
+            msg = (
+                f"chore: sync {len(synced)} file(s) from claude-base template\n\n"
+                f"Updated: {updated}\n\n"
+                "Workflow authored by Maria Matejka <vibecoding@jmq.cz>"
+            )
+            _, err, rc = run(f'git commit -m "{msg}" 2>&1')
+            if rc == 0:
+                actions.append(f"template_synced: {', '.join(synced)}")
+            else:
+                run("git reset HEAD -- .")
+                actions.append(f"template_commit_failed: {err}")
+                print(f"Template commit failed: {err}", file=sys.stderr)
+        else:
+            actions.append("template_no_changes")
+    else:
+        actions.append("template_no_changes")
+
     if current and current != "main":
         run(f"git checkout {current}")
 
