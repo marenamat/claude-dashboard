@@ -16,6 +16,8 @@ After that, on every push:
 - `main` → `https://marenamat.github.io/claude-dashboard/`
 - other branches → `https://marenamat.github.io/claude-dashboard/preview/<branch>/`
 
+**M:** Can't set to gh-pages, that branch existn't. Set to "deploy by actions".
+
 ## Required packages for issue-1 (Base implementation)
 
 The dashboard implementation requires the following packages not currently

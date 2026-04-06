@@ -22,3 +22,7 @@ Two-machine topology (issue #2):
 - **Proxy machine**: runs nginx exposed to the internet, terminates HTTPS,
   and reverse-proxies to the clankers machine over the local network.
   Config: `nginx/proxy.conf` (drop into `/etc/nginx/sites-enabled/`).
+
+# GitHub Actions
+
+GitHub Pages should be used for dashboard demonstration purposes with mock backend data.
