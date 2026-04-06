@@ -46,3 +46,11 @@ session_2026-04-05_deploy:
   - Deploys main to gh-pages root; other branches to gh-pages/preview/<branch>/.
   - Fixed stale nginx/dashboard.conf reference in build.sh.
   - GitHub Pages needs to be enabled by human guardian (see claude/questions.md).
+session_2026-04-06_maintenance:
+  - Routine workflow run. No new issues or design changes.
+  - CI still failing on origin/main (7 consecutive failures with wasm-pack).
+  - Fix is in this branch (wasm-bindgen-cli approach, commit 7d5b1e8).
+  - Both issues #1 and #2 are complete. Branch ready for human to push/merge.
+  - Confirmed local main diverges from origin/main; clanker-prep fast-forwarded
+    local main but issue-2 branch is rebased on top of origin/main (0bced95).
+  - No action needed beyond committing updated context from clanker-prep.
