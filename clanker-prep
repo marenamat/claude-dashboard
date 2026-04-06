@@ -48,42 +48,64 @@ def github_api(path):
 
 
 def get_repo():
-    """Detect GitHub repo owner/name from git remote origin."""
-    out, _, _ = run("git remote get-url origin")
-    if not out:
-        return None
-    url = out.strip()
-    if url.startswith("https://github.com/"):
-        path = url[len("https://github.com/"):]
-    elif "github.com:" in url:
-        path = url.split("github.com:")[1]
-    else:
-        return None
-    return path.removesuffix(".git").strip("/")
+    """Detect GitHub repo owner/name from git remotes.
+    Tries 'github' first (setup-remotes layout), then falls back to 'origin'.
+    """
+    for remote in ("github", "origin"):
+        out, _, rc = run(f"git remote get-url {remote}")
+        if rc != 0 or not out:
+            continue
+        url = out.strip()
+        if url.startswith("https://github.com/"):
+            path = url[len("https://github.com/"):]
+        elif "github.com:" in url:
+            path = url.split("github.com:")[1]
+        else:
+            continue
+        return path.removesuffix(".git").strip("/")
+    return None
+
+
+def get_fetch_remote():
+    """Detect the fetch remote name: tries 'github' first (setup-remotes layout), then 'origin'."""
+    for remote in ("github", "origin"):
+        _, _, rc = run(f"git remote get-url {remote}")
+        if rc == 0:
+            return remote
+    return None
 
 
 def do_git_maintenance():
     """
-    Fetch from origin, fast-forward main, rebase feature branches, prune merged.
+    Fetch from the detected remote, fast-forward main, rebase feature branches, prune merged.
     Returns list of action strings for context.
     """
     actions = []
 
+    remote = get_fetch_remote()
+    if not remote:
+        actions.append("fetch_failed: no usable remote (tried github, origin)")
+        return actions
+
     # Fetch and prune stale remote refs
-    out, err, rc = run("git fetch origin --prune 2>&1")
+    out, err, rc = run(f"git fetch {remote} --prune 2>&1")
     if rc != 0:
         print(f"git fetch failed: {out} {err}", file=sys.stderr)
         actions.append(f"fetch_failed: {err}")
     else:
         actions.append("fetched")
 
-    # Fast-forward local main if origin/main is ahead
+    # Fast-forward local main if remote/main is ahead
     local, _, _ = run("git rev-parse main")
-    remote, _, _ = run("git rev-parse origin/main")
-    if local != remote:
+    remote_main, _, rc = run(f"git rev-parse {remote}/main")
+    if rc != 0:
+        actions.append(f"fetch_failed: cannot resolve {remote}/main")
+        return actions
+
+    if local != remote_main:
         current, _, _ = run("git branch --show-current")
         run("git checkout main")
-        _, err, rc = run("git merge --ff-only origin/main")
+        _, err, rc = run(f"git merge --ff-only {remote}/main")
         if rc == 0:
             actions.append("main fast-forwarded")
         else:
@@ -91,12 +113,19 @@ def do_git_maintenance():
         if current and current != "main":
             run(f"git checkout {current}")
 
-    # Rebase all local branches (except main) onto origin/main
+    # Rebase all local branches (except main) onto local main.
+    # Local main is always >= remote/main after the fast-forward above,
+    # so rebasing onto it avoids replaying already-merged commits.
+    # Stash any dirty files so they don't block checkout/rebase (e.g. context
+    # files written by an earlier clanker-prep run that Claude hasn't committed yet).
     branches_out, _, _ = run("git branch")
     branches = [line.strip().lstrip("*").strip() for line in branches_out.splitlines()
                 if line.strip() and line.strip().lstrip("*").strip() not in ("", "main")]
     if branches:
         current, _, _ = run("git branch --show-current")
+        stash_out, _, _ = run("git stash")
+        # git stash prints "No local changes to stash" when nothing to stash
+        stashed = "No local changes" not in stash_out
         for branch in branches:
             # Skip if origin/main is already an ancestor (branch is up to date)
             _, _, ancestor_rc = run(f"git merge-base --is-ancestor origin/main {branch}")
@@ -104,7 +133,7 @@ def do_git_maintenance():
                 actions.append(f"up-to-date: {branch}")
                 continue
             run(f"git checkout {branch}")
-            _, err, rc = run("git rebase origin/main")
+            _, err, rc = run("git rebase main")
             if rc != 0:
                 print(f"Rebase of {branch} failed, aborting", file=sys.stderr)
                 run("git rebase --abort")
@@ -114,14 +143,64 @@ def do_git_maintenance():
         # Return to original branch
         restore = current if current else "main"
         run(f"git checkout {restore}")
+        if stashed:
+            run("git stash pop")
 
-    # Prune local branches fully merged into origin/main
-    merged_out, _, _ = run("git branch --merged origin/main")
+    # Prune local branches fully merged into remote/main
+    merged_out, _, _ = run(f"git branch --merged {remote}/main")
     for branch in merged_out.splitlines():
         branch = branch.strip().lstrip("*").strip()
         if branch and branch != "main":
             run(f"git branch -d {branch}")
             actions.append(f"pruned: {branch}")
+
+    return actions
+
+
+def do_template_merge():
+    """
+    If a 'claude-base' remote is configured, fetch it and merge new commits
+    from the upstream template into main. Returns list of action strings.
+    """
+    actions = []
+
+    # Check if the remote exists
+    _, _, rc = run("git remote get-url claude-base 2>/dev/null")
+    if rc != 0:
+        return actions  # No template remote configured
+
+    # Fetch from template
+    out, err, rc = run("git fetch claude-base 2>&1")
+    if rc != 0:
+        print(f"claude-base fetch failed: {err}", file=sys.stderr)
+        actions.append(f"template_fetch_failed: {err}")
+        return actions
+    actions.append("template_fetched")
+
+    # Resolve template's main branch
+    template_head, _, rc = run("git rev-parse claude-base/main")
+    if rc != 0:
+        actions.append("template_no_main_branch")
+        return actions
+
+    # Skip if template is already an ancestor of local main
+    _, _, rc = run(f"git merge-base --is-ancestor claude-base/main main")
+    if rc == 0:
+        actions.append("template_up_to_date")
+        return actions
+
+    # New template commits — try to merge into main
+    current, _, _ = run("git branch --show-current")
+    run("git checkout main")
+    _, err, rc = run("git merge --no-edit claude-base/main 2>&1")
+    if rc == 0:
+        actions.append("template_merged")
+    else:
+        run("git merge --abort 2>/dev/null || true")
+        actions.append(f"template_merge_failed: {err}")
+        print(f"Template merge failed: {err}", file=sys.stderr)
+    if current and current != "main":
+        run(f"git checkout {current}")
 
     return actions
 
@@ -192,6 +271,12 @@ def main():
     git_actions = do_git_maintenance()
     print(f"Git actions: {git_actions}", file=sys.stderr)
 
+    # --- Template merge ---
+    print("Checking upstream template (claude-base)...", file=sys.stderr)
+    template_actions = do_template_merge()
+    print(f"Template actions: {template_actions}", file=sys.stderr)
+    git_actions.extend(template_actions)
+
     # Use 'git branch' and strip the '* ' marker from the current branch
     branches_out, _, _ = run("git branch")
     existing_branches = {line.strip().lstrip("*").strip() for line in branches_out.splitlines() if line.strip()}
@@ -206,13 +291,13 @@ def main():
 
     # Rebase failures need Claude to resolve conflicts
     for action in git_actions:
-        if action.startswith("rebase_failed:"):
+        if action.startswith("rebase_failed:") or action.startswith("template_merge_failed:"):
             reasons.append(action)
 
     # --- Detect repo ---
     repo = get_repo()
     if not repo:
-        print("Cannot detect GitHub repo from origin remote", file=sys.stderr)
+        print("Cannot detect GitHub repo from remotes (tried: github, origin)", file=sys.stderr)
         reasons.append("cannot detect GitHub repo - manual check needed")
 
     # --- Issues ---

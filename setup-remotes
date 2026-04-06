@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+# setup-remotes: configure git remotes for a claude-base-derived project.
+#
+# Expected remote layout:
+#   github      https://github.com/<user>/<project>.git   (public repo, push target)
+#   clanker     <clanker-host>:claude/<project>            (clanker server, where Claude runs)
+#   claude-base https://github.com/marenamat/claude-base   (upstream template, read-only)
+#
+# Usage:
+#   ./setup-remotes [options]
+#
+# Options:
+#   --user USER          GitHub username owning the project repo
+#   --project PROJECT    Repository name (default: current directory name)
+#   --clanker-host HOST  SSH host running clanker (default: claude)
+#   --dry-run            Print commands without executing
+#   --help               Show this help
+
+set -e
+
+die() { echo "error: $*" >&2; exit 1; }
+usage() {
+  grep '^#' "$0" | grep -v '^#!/' | sed 's/^# \?//'
+  exit 0
+}
+
+# Defaults
+project=$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")
+clanker_host="claude"
+github_user=""
+dry_run=false
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --user)         github_user="$2"; shift 2 ;;
+    --project)      project="$2"; shift 2 ;;
+    --clanker-host) clanker_host="$2"; shift 2 ;;
+    --dry-run)      dry_run=true; shift ;;
+    --help|-h)      usage ;;
+    *) die "unknown option: $1" ;;
+  esac
+done
+
+[ -n "$github_user" ] || die "--user is required (your GitHub username)"
+
+github_url="https://github.com/${github_user}/${project}.git"
+github_push="git@github.com:${github_user}/${project}.git"
+clanker_url="${clanker_host}:claude/${project}"
+template_url="https://github.com/marenamat/claude-base"
+
+run() {
+  if $dry_run; then
+    echo "[dry-run] $*"
+  else
+    "$@"
+  fi
+}
+
+set_remote() {
+  local name="$1" fetch="$2" push="${3:-$2}"
+  if git remote get-url "$name" >/dev/null 2>&1; then
+    run git remote set-url "$name" "$fetch"
+    run git remote set-url --push "$name" "$push"
+  else
+    run git remote add "$name" "$fetch"
+    if [ "$fetch" != "$push" ]; then
+      run git remote set-url --push "$name" "$push"
+    fi
+  fi
+  echo "  $name: fetch=$fetch push=$push"
+}
+
+echo "Configuring remotes for ${github_user}/${project}:"
+set_remote github  "$github_url"    "$github_push"
+set_remote clanker "$clanker_url"   "$clanker_url"
+set_remote claude-base "$template_url" "$template_url"
+
+echo ""
+echo "Done. Recommended workflow:"
+echo "  git fetch claude-base          # pull in template improvements"
+echo "  git merge claude-base/main     # merge them into your branch"
+echo "  git push github main           # publish to GitHub"
+echo "  git push clanker main          # sync to clanker server"
