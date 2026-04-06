@@ -72,6 +72,7 @@ def parse_log(log_path):
             "start": None,
             "end": None,
             "invoked": False,
+            "limit_hit": False,
             "cost_usd": None,
             "tokens_in": None,
             "tokens_out": None,
@@ -94,10 +95,12 @@ def parse_log(log_path):
                     lines = lines[:i]
                 break
 
-        # Scan body for invocation signal and token data
+        # Scan body for invocation signal, rate-limit hit, and token data
         for line in lines:
             if "INVOKE_CLAUDE" in line or "Prep decision: INVOKE_CLAUDE" in line:
                 run["invoked"] = True
+            if "you've hit your limit" in line.lower():
+                run["limit_hit"] = True
             m = RE_COST.search(line)
             if m:
                 try:
@@ -219,12 +222,20 @@ def render_project_html(proj):
 
     rows = []
     for run in runs:
-        invoked_class = "table-warning" if run["invoked"] else ""
+        # limit_hit takes priority over invoked for row colour
+        if run.get("limit_hit"):
+            row_class = "table-danger"
+        elif run["invoked"]:
+            row_class = "table-warning"
+        else:
+            row_class = ""
+        limit_badge = ('<span class="badge bg-danger ms-1" title="Hit rate limit">limit</span>'
+                       if run.get("limit_hit") else "")
         log_id = f"log-{id(run)}"
         log_escaped = html.escape(run["log"])
         rows.append(f"""
-      <tr class="{invoked_class}">
-        <td>{html.escape(fmt_dt(run["start"]))}</td>
+      <tr class="{row_class}">
+        <td>{html.escape(fmt_dt(run["start"]))}{limit_badge}</td>
         <td>{"Yes" if run["invoked"] else "No"}</td>
         <td>{html.escape(fmt_duration(run))}</td>
         <td>{html.escape(fmt_cost(run))}</td>

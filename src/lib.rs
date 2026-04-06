@@ -178,6 +178,7 @@ fn compute_duration(start: &str, end: &str) -> String {
 struct RunView {
   start: String,
   invoked: bool,
+  limit_hit: bool,
   duration: String,
   cost: String,
   log: String,
@@ -205,6 +206,7 @@ fn parse_run(v: &ciborium::value::Value) -> RunView {
   let start_raw = extract_text_or_tag(&map, "start").unwrap_or_default();
   let end_raw   = extract_text_or_tag(&map, "end").unwrap_or_default();
   let invoked   = val_as_bool(&map, "invoked");
+  let limit_hit = val_as_bool(&map, "limit_hit");
   let cost_usd  = val_as_f64(&map, "cost_usd");
   let tokens_in  = val_as_u64(&map, "tokens_in");
   let tokens_out = val_as_u64(&map, "tokens_out");
@@ -228,7 +230,7 @@ fn parse_run(v: &ciborium::value::Value) -> RunView {
     String::from("—")
   };
 
-  RunView { start, invoked, duration, cost, log }
+  RunView { start, invoked, limit_hit, duration, cost, log }
 }
 
 // ---------------------------------------------------------------------------
@@ -243,11 +245,15 @@ fn esc(s: &str) -> String {
 }
 
 fn render_run_row(run: &RunView) -> String {
-  let row_class = if run.invoked { "table-warning" } else { "" };
+  // limit_hit takes priority for row colour
+  let row_class = if run.limit_hit { "table-danger" } else if run.invoked { "table-warning" } else { "" };
   let invoked_label = if run.invoked { "Yes" } else { "No" };
+  let limit_badge = if run.limit_hit {
+    r#" <span class="badge bg-danger ms-1" title="Hit rate limit">limit</span>"#
+  } else { "" };
   format!(
     r#"<tr class="{row_class}">
-      <td>{start}</td>
+      <td>{start}{limit}</td>
       <td>{invoked}</td>
       <td>{dur}</td>
       <td>{cost}</td>
@@ -255,6 +261,7 @@ fn render_run_row(run: &RunView) -> String {
     </tr>"#,
     row_class = row_class,
     start = esc(&run.start),
+    limit = limit_badge,
     invoked = invoked_label,
     dur = esc(&run.duration),
     cost = esc(&run.cost),
