@@ -3,18 +3,7 @@ branches:
 - main
 maintenance_actions:
 - fetched
-- "main ff failed: local main (3a576a9) and origin/main (83df31f) diverge with same
-  self-improvement commit at different SHAs (3a576a9 vs 6beb84a) due to independent
-  history. Merge required; human guardian action needed."
-- 'up-to-date: issue-2-separate-nginx (1 commit ahead of origin/main, not pushed)'
-recorded_at: '2026-04-06T14:00:00Z'
-notes:
-  issue_2_branch: |
-    issue-2-separate-nginx is 1 commit ahead of origin/main:
-    - 29ac7eb: ci: split build step into sub-steps for failure diagnosis
-    This branch has no remote tracking branch (never pushed).
-    Pushing it would trigger CI with split steps.
-  local_main_divergence: |
-    Local main has 3a576a9 (self-improvements: skip unnecessary branch rebases)
-    which is the same logical change as 6beb84a on origin/main, but different SHA.
-    Both have same author/date/message. Diverged due to separate rebase history.
+- 'main ff failed: diverging branches (local has claude-base merge, origin/main has
+  answers commit)'
+- 'rebase issue-2-separate-nginx: succeeded (manual rebase after stash)'
+recorded_at: '2026-04-06T11:48:49.189285+00:00'

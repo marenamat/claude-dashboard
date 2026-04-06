@@ -1,8 +1,8 @@
-recorded_at: '2026-04-06T14:00:00Z'
+recorded_at: '2026-04-06T16:00:00Z'
 branch: issue-2-separate-nginx
 status: waiting_for_ci_diagnosis
 ci_status:
-  main: failing (origin/main at 83df31f, 12 consecutive failures)
+  main: failing (origin/main at 32109a2, 14 consecutive failures)
   wasm_pack_fix: merged to origin/main at 7d5b1e8 — CI still fails after this
   wasm_bindgen_version_fix: merged to origin/main at 877ff43 — CI still fails after this
   root_cause: unknown (GitHub API returns 403 on log downloads)
@@ -127,3 +127,13 @@ session_2026-04-06_maintenance_15:
   - No new GitHub issues. No design changes.
   - Action needed: human guardian must push issue-2-separate-nginx to trigger CI
     with split steps and report which step fails.
+session_2026-04-06_maintenance_16:
+  - New CI run at 11:31Z (run 24030167377) triggered by Maria's answers commit.
+  - Still failing: Install wasm-bindgen-cli succeeds, Build (./build.sh) fails.
+  - Rebase conflict resolved: issue-2-separate-nginx rebased onto 32109a2.
+  - deploy.yml updated: replaced gh-pages branch push with GitHub Actions Pages
+    deployment (actions/deploy-pages). Triggered by Maria's answer about "deploy
+    by actions" setting. Only runs on main branch now.
+  - questions.md updated: GitHub Pages question marked resolved.
+  - Build failure root cause still unknown. Sub-step split (29ac7eb) will diagnose
+    on next CI run. Human guardian must push issue-2-separate-nginx.

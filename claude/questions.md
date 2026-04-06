@@ -13,23 +13,13 @@ sub-step fails. Please check the failing step in the next CI run and report back
 Alternatively, please grant the workflow logs read access by checking if the GitHub
 token has the `actions: read` permission, or share the relevant step's output.
 
-## GitHub Pages setup required for branch preview deployments
+## GitHub Pages setup — RESOLVED
 
-The `deploy.yml` workflow deploys built output to the `gh-pages` branch so
-every branch gets a preview URL (CLAUDE.md requirement). This requires one
-manual step:
-
-Enable GitHub Pages on the repo:
-- Go to https://github.com/marenamat/claude-dashboard/settings/pages
-- Source: **Deploy from a branch**
-- Branch: **gh-pages**, folder: **/ (root)**
-- Save
-
-After that, on every push:
-- `main` → `https://marenamat.github.io/claude-dashboard/`
-- other branches → `https://marenamat.github.io/claude-dashboard/preview/<branch>/`
+Updated `deploy.yml` to use GitHub Actions Pages deployment (`actions/deploy-pages`).
+No gh-pages branch required. Runs on `main` only.
 
 **M:** Can't set to gh-pages, that branch existn't. Set to "deploy by actions".
+**Resolution:** deploy.yml updated to use GitHub Actions workflow deployment.
 
 ## Required packages for issue-1 (Base implementation)
 
