@@ -128,9 +128,30 @@ def do_git_maintenance():
         stashed = "No local changes" not in stash_out
         for branch in branches:
             run(f"git checkout {branch}")
+
+            # First, incorporate upstream changes for this branch if the remote
+            # has a tracking branch for it (e.g. origin/issue-10 → local issue-10).
+            _, _, rc = run(f"git rev-parse {remote}/{branch} 2>/dev/null")
+            if rc == 0:
+                # Try rebase onto remote branch first (cleanest history)
+                _, err, rc = run(f"git rebase {remote}/{branch}")
+                if rc != 0:
+                    print(f"Rebase of {branch} onto {remote}/{branch} failed, trying merge", file=sys.stderr)
+                    run("git rebase --abort")
+                    # Fall back to merge when rebase isn't possible
+                    _, err, rc = run(f"git merge --no-ff {remote}/{branch}")
+                    if rc != 0:
+                        run("git merge --abort")
+                        actions.append(f"upstream_merge_failed: {branch}")
+                    else:
+                        actions.append(f"upstream_merged: {branch}")
+                else:
+                    actions.append(f"upstream_rebased: {branch}")
+
+            # Then rebase onto main to get the latest main changes
             _, err, rc = run("git rebase main")
             if rc != 0:
-                print(f"Rebase of {branch} failed, aborting", file=sys.stderr)
+                print(f"Rebase of {branch} onto main failed, aborting", file=sys.stderr)
                 run("git rebase --abort")
                 actions.append(f"rebase_failed: {branch}")
             else:
