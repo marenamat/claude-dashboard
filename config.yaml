@@ -5,3 +5,7 @@
 projects:
   - path: ~/claude/claude-dashboard
     name: claude-dashboard
+  - path: ~/claude/claude-base
+    name: claude-base
+  - path: ~/claude/alb
+    name: alb
