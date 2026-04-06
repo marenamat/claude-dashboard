@@ -127,11 +127,6 @@ def do_git_maintenance():
         # git stash prints "No local changes to stash" when nothing to stash
         stashed = "No local changes" not in stash_out
         for branch in branches:
-            # Skip if origin/main is already an ancestor (branch is up to date)
-            _, _, ancestor_rc = run(f"git merge-base --is-ancestor origin/main {branch}")
-            if ancestor_rc == 0:
-                actions.append(f"up-to-date: {branch}")
-                continue
             run(f"git checkout {branch}")
             _, err, rc = run("git rebase main")
             if rc != 0:
@@ -424,6 +419,15 @@ def main():
         yaml.dump(issues_ctx, f, default_flow_style=False, allow_unicode=True)
 
     # --- Pipelines ---
+    # Load previously seen run IDs to avoid re-triggering on already-known failures.
+    seen_ids_path = context_dir / "seen_pipeline_run_ids.yaml"
+    if seen_ids_path.exists():
+        with open(seen_ids_path) as f:
+            seen_data = yaml.safe_load(f) or {}
+            seen_ids = set(seen_data.get("seen_ids", []))
+    else:
+        seen_ids = set()
+
     pipeline_ctx = {"fetched_at": now, "repo": repo, "runs": []}
     if repo:
         print("Fetching pipeline results...", file=sys.stderr)
@@ -433,11 +437,21 @@ def main():
         elif runs is not None:
             pipeline_ctx["runs"] = runs
             for r in runs:
-                if r["conclusion"] in ("failure", "action_required") and r["branch"] == "main":
-                    reasons.append(f"pipeline failure on main: {r['name']}")
+                if r["id"] not in seen_ids:
+                    # Only trigger on failures we haven't seen before
+                    if r["conclusion"] in ("failure", "action_required") and r["branch"] == "main":
+                        reasons.append(f"pipeline failure on main: {r['name']}")
+                # Mark every fetched run ID as seen regardless of outcome
+                seen_ids.add(r["id"])
 
     with open(context_dir / "pipeline_results.yaml", "w") as f:
         yaml.dump(pipeline_ctx, f, default_flow_style=False, allow_unicode=True)
+
+    # Persist seen run IDs so future cycles don't re-trigger on the same failures.
+    # Keep at most 500 IDs to prevent unbounded growth (sorted descending = newest first).
+    seen_list = sorted(seen_ids, reverse=True)[:500]
+    with open(seen_ids_path, "w") as f:
+        yaml.dump({"seen_ids": seen_list}, f, default_flow_style=False)
 
     # --- Decision ---
     if reasons:
