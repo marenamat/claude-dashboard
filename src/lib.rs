@@ -8,10 +8,7 @@ use std::collections::BTreeMap;
 // CBOR deserialisation helpers
 // ---------------------------------------------------------------------------
 
-// ciborium represents timestamps as tagged values; we map them to strings.
-// This custom visitor accepts either a string or a tagged datetime.
 fn decode_data(bytes: &[u8]) -> Result<(String, Vec<ProjectView>), String> {
-  // Use ciborium to parse into a generic Value first, then extract fields.
   let value: ciborium::value::Value = ciborium::de::from_reader(bytes)
     .map_err(|e| format!("CBOR parse error: {e}"))?;
 
@@ -74,7 +71,6 @@ fn val_as_bool(map: &BTreeMap<String, ciborium::value::Value>, key: &str) -> boo
 fn val_as_f64(map: &BTreeMap<String, ciborium::value::Value>, key: &str) -> Option<f64> {
   match map.get(key)? {
     ciborium::value::Value::Float(f) => Some(*f),
-    // ciborium::Integer has no Into<f64>; go via i64
     ciborium::value::Value::Integer(i) => i64::try_from(*i).ok().map(|n| n as f64),
     _ => None,
   }
@@ -82,7 +78,6 @@ fn val_as_f64(map: &BTreeMap<String, ciborium::value::Value>, key: &str) -> Opti
 
 fn val_as_u64(map: &BTreeMap<String, ciborium::value::Value>, key: &str) -> Option<u64> {
   match map.get(key)? {
-    // TryFrom<Integer> for u64 returns Err for negatives, which we want to drop
     ciborium::value::Value::Integer(i) => u64::try_from(*i).ok(),
     _ => None,
   }
@@ -100,13 +95,11 @@ fn val_as_str(map: &BTreeMap<String, ciborium::value::Value>, key: &str) -> Stri
 // ---------------------------------------------------------------------------
 
 // Parse ISO 8601 datetime string "YYYY-MM-DDTHH:MM:SS[.frac][+HH:MM|Z]"
-// into Unix epoch seconds.  Only handles UTC (+00:00 / Z) cleanly;
-// other offsets are parsed and applied correctly too.
+// into Unix epoch seconds.
 fn parse_timestamp_secs(s: &str) -> Option<i64> {
   let s = s.trim();
   if s.len() < 19 { return None; }
 
-  // Parse fixed fields
   let y: i64  = s[0..4].parse().ok()?;
   let mo: i64 = s[5..7].parse().ok()?;
   let d: i64  = s[8..10].parse().ok()?;
@@ -114,12 +107,9 @@ fn parse_timestamp_secs(s: &str) -> Option<i64> {
   let mi: i64 = s[14..16].parse().ok()?;
   let sc: i64 = s[17..19].parse().ok()?;
 
-  // Parse timezone offset (everything after the fractional seconds)
   let tz_offset_secs: i64 = {
-    // Skip fractional seconds
     let rest = &s[19..];
     let rest = if rest.starts_with('.') {
-      // Find end of fractional part
       let end = rest.find(|c: char| !c.is_ascii_digit() && c != '.').unwrap_or(rest.len());
       &rest[end..]
     } else {
@@ -138,8 +128,7 @@ fn parse_timestamp_secs(s: &str) -> Option<i64> {
     }
   };
 
-  // Days since Unix epoch using the civil-to-days algorithm
-  // (https://howardhinnant.github.io/date_algorithms.html)
+  // Days since Unix epoch (https://howardhinnant.github.io/date_algorithms.html)
   let y = if mo <= 2 { y - 1 } else { y };
   let era: i64 = if y >= 0 { y } else { y - 399 } / 400;
   let yoe: i64 = y - era * 400;
@@ -150,13 +139,61 @@ fn parse_timestamp_secs(s: &str) -> Option<i64> {
   Some(days * 86400 + h * 3600 + mi * 60 + sc - tz_offset_secs)
 }
 
-// Format an ISO datetime string for display, stripping sub-second and timezone noise.
-fn fmt_ts(s: &str) -> String {
-  if s.len() >= 19 {
-    // "YYYY-MM-DD HH:MM:SS UTC"
-    format!("{} {} UTC", &s[0..10], &s[11..19])
-  } else {
-    s.to_owned()
+// Extract (year, month 1-12, day 1-31) from epoch seconds (UTC).
+fn epoch_to_ymd(secs: i64) -> (i32, u32, u32) {
+  let days = secs.div_euclid(86400);
+  let z = days + 719468;
+  let era = z.div_euclid(146097);
+  let doe = z - era * 146097;
+  let yoe = (doe - doe/1460 + doe/36524 - doe/146096) / 365;
+  let y = yoe + era * 400;
+  let doy = doe - (365*yoe + yoe/4 - yoe/100);
+  let mp = (5*doy + 2)/153;
+  let d = doy - (153*mp+2)/5 + 1;
+  let m = if mp < 10 { mp + 3 } else { mp - 9 };
+  let y = if m <= 2 { y + 1 } else { y };
+  (y as i32, m as u32, d as u32)
+}
+
+// Weekday from epoch seconds (UTC): 0=Sunday … 6=Saturday.
+// Unix epoch (1970-01-01) was a Thursday (4).
+fn epoch_to_weekday(secs: i64) -> usize {
+  let days = secs.div_euclid(86400);
+  ((days + 4).rem_euclid(7)) as usize
+}
+
+// Format a run timestamp relative to now_secs (UTC).
+// - same day  → "today HH:MM"
+// - 1 day ago → "yesterday HH:MM"
+// - 2–5 days  → "weekday HH:MM"
+// - older     → "Apr 01, HH:MM"
+fn fmt_ts_relative(ts: &str, now_secs: i64) -> String {
+  // Extract "HH:MM" from the raw ISO string
+  let hhmm = if ts.len() >= 16 { &ts[11..16] } else { "" };
+
+  let ts_secs = match parse_timestamp_secs(ts) {
+    Some(v) => v,
+    None => return if !hhmm.is_empty() { format!("{} {}", &ts[0..10], hhmm) } else { ts.to_owned() },
+  };
+
+  let ts_day  = ts_secs.div_euclid(86400);
+  let now_day = now_secs.div_euclid(86400);
+  let days_ago = now_day - ts_day;
+
+  const WEEKDAYS: [&str; 7] = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+  const MONTHS:   [&str; 12] = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+  match days_ago {
+    0          => format!("today {hhmm}"),
+    1          => format!("yesterday {hhmm}"),
+    2..=5 => {
+      let wd = epoch_to_weekday(ts_secs);
+      format!("{} {hhmm}", WEEKDAYS[wd])
+    }
+    _ => {
+      let (_, m, d) = epoch_to_ymd(ts_secs);
+      format!("{} {:02}, {hhmm}", MONTHS[(m - 1) as usize], d)
+    }
   }
 }
 
@@ -176,7 +213,7 @@ fn compute_duration(start: &str, end: &str) -> String {
 // ---------------------------------------------------------------------------
 
 struct RunView {
-  start: String,
+  start_raw: String,  // raw ISO string for relative formatting
   invoked: bool,
   limit_hit: bool,
   duration: String,
@@ -212,7 +249,6 @@ fn parse_run(v: &ciborium::value::Value) -> RunView {
   let tokens_out = val_as_u64(&map, "tokens_out");
   let log = val_as_str(&map, "log");
 
-  let start    = if start_raw.is_empty() { "—".into() } else { fmt_ts(&start_raw) };
   let duration = if !start_raw.is_empty() && !end_raw.is_empty() {
     compute_duration(&start_raw, &end_raw)
   } else {
@@ -230,7 +266,7 @@ fn parse_run(v: &ciborium::value::Value) -> RunView {
     String::from("—")
   };
 
-  RunView { start, invoked, limit_hit, duration, cost, log }
+  RunView { start_raw, invoked, limit_hit, duration, cost, log }
 }
 
 // ---------------------------------------------------------------------------
@@ -244,58 +280,91 @@ fn esc(s: &str) -> String {
    .replace('"', "&quot;")
 }
 
-fn render_run_row(run: &RunView) -> String {
-  // limit_hit takes priority for row colour
+fn render_run_row(run: &RunView, now_secs: i64) -> String {
+  let start_disp = if run.start_raw.is_empty() {
+    "—".to_owned()
+  } else {
+    fmt_ts_relative(&run.start_raw, now_secs)
+  };
+  // limit_hit takes priority over invoked for row colour
   let row_class = if run.limit_hit { "table-danger" } else if run.invoked { "table-warning" } else { "" };
-  let invoked_label = if run.invoked { "Yes" } else { "No" };
+  let inv_class = if run.invoked { "inv-dot inv-yes" } else { "inv-dot inv-no" };
   let limit_badge = if run.limit_hit {
     r#" <span class="badge bg-danger ms-1" title="Hit rate limit">limit</span>"#
   } else { "" };
   format!(
     r#"<tr class="{row_class}">
-      <td>{start}{limit}</td>
-      <td>{invoked}</td>
+      <td class="text-nowrap">{start}{limit}</td>
+      <td><span class="{inv}" title="{inv_title}"></span></td>
       <td>{dur}</td>
       <td>{cost}</td>
       <td><details><summary>show</summary><pre class="log-snippet">{log}</pre></details></td>
     </tr>"#,
     row_class = row_class,
-    start = esc(&run.start),
+    start = esc(&start_disp),
     limit = limit_badge,
-    invoked = invoked_label,
+    inv = inv_class,
+    inv_title = if run.invoked { "Invoked" } else { "Not invoked" },
     dur = esc(&run.duration),
     cost = esc(&run.cost),
     log = esc(&run.log),
   )
 }
 
-fn render_project(proj: &ProjectView) -> String {
-  let rows: String = if proj.runs.is_empty() {
+const SHOW_INITIAL: usize = 5;
+
+fn render_project(proj: &ProjectView, now_secs: i64) -> String {
+  let visible = &proj.runs[..proj.runs.len().min(SHOW_INITIAL)];
+  let extra   = if proj.runs.len() > SHOW_INITIAL { &proj.runs[SHOW_INITIAL..] } else { &[] };
+
+  let visible_rows: String = if visible.is_empty() {
     r#"<tr><td colspan="5" class="text-muted">No runs recorded.</td></tr>"#.into()
   } else {
-    proj.runs.iter().map(render_run_row).collect()
+    visible.iter().map(|r| render_run_row(r, now_secs)).collect()
+  };
+
+  // Extra runs: second tbody hidden by default, revealed by "show more" button
+  let extra_html = if !extra.is_empty() {
+    let extra_rows: String = extra.iter().map(|r| render_run_row(r, now_secs)).collect();
+    let n    = extra.len();
+    let tbid = format!("extra-{}", esc(&proj.name));
+    format!(
+      r#"<tbody id="{tbid}" class="d-none">{rows}</tbody>
+      <tfoot><tr><td colspan="5">
+        <button class="btn btn-link btn-sm p-0 show-more-btn" data-target="{tbid}">Show {n} more…</button>
+      </td></tr></tfoot>"#,
+      tbid = tbid, rows = extra_rows, n = n
+    )
+  } else {
+    String::new()
   };
 
   format!(
-    r#"<section class="project-section mb-5" id="proj-{id}">
-  <h2 class="h4">{name}</h2>
-  <p class="text-muted small">{path}</p>
+    r#"<div class="col-12 col-md-6 col-xl-4 col-xxl-3">
+<section class="project-section h-100" id="proj-{id}">
+  <h2 class="h5">{name}</h2>
+  <p class="text-muted small mb-2">{path}</p>
   <div class="table-responsive">
-    <table class="table table-sm table-bordered table-hover align-middle">
+    <table class="table table-sm table-bordered table-hover align-middle mb-0">
       <thead class="table-dark">
         <tr>
-          <th>Start (UTC)</th><th>Invoked</th><th>Duration</th>
-          <th>Cost / Tokens</th><th>Log</th>
+          <th>Start</th>
+          <th title="Invoked"></th>
+          <th>Duration</th>
+          <th>Cost / Tokens</th>
+          <th>Log</th>
         </tr>
       </thead>
-      <tbody>{rows}</tbody>
+      <tbody>{rows}</tbody>{extra}
     </table>
   </div>
-</section>"#,
-    id = esc(&proj.name),
+</section>
+</div>"#,
+    id   = esc(&proj.name),
     name = esc(&proj.name),
     path = esc(&proj.path),
-    rows = rows,
+    rows = visible_rows,
+    extra = extra_html,
   )
 }
 
@@ -304,13 +373,14 @@ fn render_project(proj: &ProjectView) -> String {
 // ---------------------------------------------------------------------------
 
 /// Render dashboard HTML from raw CBOR bytes.
+/// now_secs: current UTC epoch seconds (from JS Date.now()/1000) for relative timestamps.
 /// Returns an HTML string on success, or an error message prefixed with "ERROR:".
 #[wasm_bindgen]
-pub fn render_dashboard(cbor_bytes: &[u8]) -> String {
+pub fn render_dashboard(cbor_bytes: &[u8], now_secs: i64) -> String {
   match decode_data(cbor_bytes) {
     Err(e) => format!("ERROR: {e}"),
     Ok((generated_at, projects)) => {
-      let sections: String = projects.iter().map(render_project).collect();
+      let sections: String = projects.iter().map(|p| render_project(p, now_secs)).collect();
       let nav: String = projects.iter().map(|p|
         format!(r##"<li class="nav-item"><a class="nav-link" href="#proj-{id}">{name}</a></li>"##,
           id = esc(&p.name), name = esc(&p.name))

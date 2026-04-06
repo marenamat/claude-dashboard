@@ -28,6 +28,21 @@
       .replace(/>/g, "&gt;");
   }
 
+  // Wire up "show N more" buttons injected by WASM.
+  // Each button has data-target="<tbody id>"; clicking reveals that tbody
+  // and hides the button row.
+  function wireShowMore(root) {
+    root.querySelectorAll(".show-more-btn").forEach(function(btn) {
+      btn.addEventListener("click", function() {
+        const target = document.getElementById(btn.dataset.target);
+        if (target) target.classList.remove("d-none");
+        // Hide the tfoot containing this button
+        const tfoot = btn.closest("tfoot");
+        if (tfoot) tfoot.style.display = "none";
+      });
+    });
+  }
+
   // Fetch data.cbor as ArrayBuffer
   function fetchData() {
     return fetch(DATA_URL).then(function(r) {
@@ -37,8 +52,6 @@
   }
 
   // Dynamically load the wasm-pack generated JS module, then the WASM binary.
-  // wasm-pack generates an ES module; we load it via a dynamic import if supported,
-  // otherwise fall back to the static HTML already in the page.
   function loadWasm() {
     return import(JS_URL).then(function(mod) {
       return mod.default(WASM_URL).then(function() { return mod; });
@@ -48,10 +61,13 @@
   function run() {
     showLoading();
 
+    // Current UTC epoch seconds for relative timestamp display
+    const nowSecs = Math.floor(Date.now() / 1000);
+
     Promise.all([fetchData(), loadWasm()])
       .then(function([buf, wasm]) {
         const bytes = new Uint8Array(buf);
-        const html = wasm.render_dashboard(bytes);
+        const html = wasm.render_dashboard(bytes, nowSecs);
 
         if (html.startsWith("ERROR:")) {
           showError(html.slice(6).trim());
@@ -74,18 +90,23 @@
 
         // Replace main content
         const sections = tmp.querySelector("#dash-content");
-        if (content && sections) content.innerHTML = sections.innerHTML;
+        if (content && sections) {
+          content.innerHTML = sections.innerHTML;
+          wireShowMore(content);
+        }
       })
       .catch(function(err) {
         // WASM unavailable or data missing: leave static HTML in place.
         console.warn("Dashboard WASM unavailable, using static HTML:", err);
-        if (content)
+        if (content) {
           content.insertAdjacentHTML(
             "afterbegin",
             `<div class="alert alert-warning small mb-3">
               Live rendering unavailable (${escHtml(err.message)}). Showing static data.
              </div>`
           );
+          wireShowMore(content);
+        }
       });
   }
 

@@ -9,7 +9,7 @@ import sys
 import html
 import cbor2
 import yaml
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
@@ -21,6 +21,7 @@ CONFIG_PATH = SELFDIR / "config.yaml"
 WWW = SELFDIR / "www"
 MAX_LOG_LINES = 40   # log lines kept per run
 MAX_RUNS = 50        # most recent runs kept per project
+SHOW_INITIAL = 5     # runs shown by default; rest behind "show more"
 
 
 # ---------------------------------------------------------------------------
@@ -28,7 +29,7 @@ MAX_RUNS = 50        # most recent runs kept per project
 # ---------------------------------------------------------------------------
 
 # Patterns for token/cost lines emitted by Claude Code CLI
-RE_COST    = re.compile(r"Total cost:\s*\$?([\d.]+)", re.IGNORECASE)
+RE_COST       = re.compile(r"Total cost:\s*\$?([\d.]+)", re.IGNORECASE)
 RE_TOKENS_IN  = re.compile(r"Input tokens?:\s*([\d,]+)", re.IGNORECASE)
 RE_TOKENS_OUT = re.compile(r"Output tokens?:\s*([\d,]+)", re.IGNORECASE)
 
@@ -36,7 +37,6 @@ RE_TOKENS_OUT = re.compile(r"Output tokens?:\s*([\d,]+)", re.IGNORECASE)
 def parse_date_line(line):
     """Parse the date lines written by `date` command.  Returns datetime or None."""
     line = line.strip()
-    # Try ISO format first (future-proof)
     for fmt in (
         "%Y-%m-%dT%H:%M:%S%z",
         "%a %b %d %H:%M:%S %Z %Y",   # Sun Apr  5 19:16:37 CEST 2026
@@ -60,7 +60,6 @@ def parse_log(log_path):
         print(f"  Warning: cannot read {log_path}: {e}", file=sys.stderr)
         return []
 
-    # Split into raw run blocks on "==========="
     blocks = re.split(r"^===========\s*$", text, flags=re.MULTILINE)
     runs = []
     for block in blocks:
@@ -120,13 +119,11 @@ def parse_log(log_path):
                 except ValueError:
                     pass
 
-        # Keep the last MAX_LOG_LINES lines as the log snippet
         run["log"] = "\n".join(lines[-MAX_LOG_LINES:])
 
         if run["start"] is not None:
             runs.append(run)
 
-    # Sort by start time, newest first, cap
     runs.sort(key=lambda r: r["start"], reverse=True)
     return runs[:MAX_RUNS]
 
@@ -160,7 +157,6 @@ def collect(config):
 
 def write_cbor(data, out_path):
     """Serialise data to CBOR, writing to out_path."""
-    # Convert datetime objects to timestamps for CBOR
     def prepare(obj):
         if isinstance(obj, datetime):
             return obj
@@ -180,11 +176,37 @@ def write_cbor(data, out_path):
 # Static HTML generation
 # ---------------------------------------------------------------------------
 
-def fmt_dt(dt):
-    """Format datetime for display, or return '—'."""
+WEEKDAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]
+MONTHS   = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+
+def fmt_dt_relative(dt, now):
+    """Format a datetime relative to now.
+
+    - same day        → "today HH:MM"
+    - 1 day ago       → "yesterday HH:MM"
+    - 2–5 days ago    → "weekday HH:MM"
+    - older           → "Apr 01, HH:MM"
+    """
     if dt is None:
         return "—"
-    return dt.strftime("%Y-%m-%d %H:%M:%S UTC")
+    dt_utc  = dt.astimezone(timezone.utc)
+    now_utc = now.astimezone(timezone.utc)
+    # Compare calendar days in UTC
+    dt_day  = dt_utc.date()
+    now_day = now_utc.date()
+    days_ago = (now_day - dt_day).days
+    hhmm = dt_utc.strftime("%H:%M")
+    if days_ago == 0:
+        return f"today {hhmm}"
+    elif days_ago == 1:
+        return f"yesterday {hhmm}"
+    elif 2 <= days_ago <= 5:
+        # weekday name of the run date (Monday=0 in Python isoweekday; we want Sun=0)
+        wd = dt_day.isoweekday() % 7  # Sun=0, Mon=1, ..., Sat=6
+        return f"{WEEKDAYS[wd]} {hhmm}"
+    else:
+        return f"{MONTHS[dt_utc.month - 1]} {dt_utc.day:02d}, {hhmm}"
 
 
 def fmt_duration(run):
@@ -214,68 +236,91 @@ def fmt_cost(run):
     return "—"
 
 
-def render_project_html(proj):
-    """Render HTML for one project section."""
-    name = html.escape(proj["name"])
-    path = html.escape(proj["path"])
-    runs = proj["runs"]
-
-    rows = []
-    for run in runs:
-        # limit_hit takes priority over invoked for row colour
-        if run.get("limit_hit"):
-            row_class = "table-danger"
-        elif run["invoked"]:
-            row_class = "table-warning"
-        else:
-            row_class = ""
-        limit_badge = ('<span class="badge bg-danger ms-1" title="Hit rate limit">limit</span>'
-                       if run.get("limit_hit") else "")
-        log_id = f"log-{id(run)}"
-        log_escaped = html.escape(run["log"])
-        rows.append(f"""
-      <tr class="{row_class}">
-        <td>{html.escape(fmt_dt(run["start"]))}{limit_badge}</td>
-        <td>{"Yes" if run["invoked"] else "No"}</td>
+def render_run_row(run, now):
+    """Render one <tr> for a run."""
+    # limit_hit takes priority over invoked for row colour
+    if run.get("limit_hit"):
+        tr_class = "table-danger"
+    elif run["invoked"]:
+        tr_class = "table-warning"
+    else:
+        tr_class = ""
+    inv_class = "inv-dot inv-yes" if run["invoked"] else "inv-dot inv-no"
+    inv_title = "Invoked" if run["invoked"] else "Not invoked"
+    limit_badge = ('<span class="badge bg-danger ms-1" title="Hit rate limit">limit</span>'
+                   if run.get("limit_hit") else "")
+    start_str = html.escape(fmt_dt_relative(run["start"], now))
+    log_escaped = html.escape(run["log"])
+    return f"""
+      <tr class="{tr_class}">
+        <td class="text-nowrap">{start_str}{limit_badge}</td>
+        <td><span class="{inv_class}" title="{inv_title}"></span></td>
         <td>{html.escape(fmt_duration(run))}</td>
         <td>{html.escape(fmt_cost(run))}</td>
         <td>
           <details>
             <summary>show</summary>
-            <pre class="log-snippet" id="{log_id}">{log_escaped}</pre>
+            <pre class="log-snippet">{log_escaped}</pre>
           </details>
         </td>
-      </tr>""")
+      </tr>"""
 
-    rows_html = "".join(rows) if rows else \
+
+def render_project_html(proj, now):
+    """Render HTML for one project section wrapped in a Bootstrap column div."""
+    name = html.escape(proj["name"])
+    path = html.escape(proj["path"])
+    proj_id = html.escape(proj["name"])
+    runs = proj["runs"]
+
+    visible = runs[:SHOW_INITIAL]
+    extra   = runs[SHOW_INITIAL:]
+
+    visible_rows = "".join(render_run_row(r, now) for r in visible) if visible else \
         '<tr><td colspan="5" class="text-muted">No runs recorded.</td></tr>'
 
+    # Extra runs: second tbody hidden by default (no JS = stays hidden)
+    extra_html = ""
+    if extra:
+        extra_rows = "".join(render_run_row(r, now) for r in extra)
+        n    = len(extra)
+        tbid = html.escape(f"extra-{proj['name']}")
+        extra_html = f"""
+      <tbody id="{tbid}" class="d-none">{extra_rows}
+      </tbody>
+      <tfoot><tr><td colspan="5">
+        <button class="btn btn-link btn-sm p-0 show-more-btn" data-target="{tbid}">Show {n} more\u2026</button>
+      </td></tr></tfoot>"""
+
     return f"""
-  <section class="project-section mb-5" id="proj-{html.escape(proj['name'])}">
-    <h2 class="h4">{name}</h2>
-    <p class="text-muted small">{path}</p>
-    <div class="table-responsive">
-      <table class="table table-sm table-bordered table-hover align-middle">
-        <thead class="table-dark">
-          <tr>
-            <th>Start (UTC)</th>
-            <th>Invoked</th>
-            <th>Duration</th>
-            <th>Cost / Tokens</th>
-            <th>Log</th>
-          </tr>
-        </thead>
-        <tbody>{rows_html}
-        </tbody>
-      </table>
-    </div>
-  </section>"""
+  <div class="col-12 col-md-6 col-xl-4 col-xxl-3">
+    <section class="project-section h-100" id="proj-{proj_id}">
+      <h2 class="h5">{name}</h2>
+      <p class="text-muted small mb-2">{path}</p>
+      <div class="table-responsive">
+        <table class="table table-sm table-bordered table-hover align-middle mb-0">
+          <thead class="table-dark">
+            <tr>
+              <th>Start</th>
+              <th title="Invoked"></th>
+              <th>Duration</th>
+              <th>Cost / Tokens</th>
+              <th>Log</th>
+            </tr>
+          </thead>
+          <tbody>{visible_rows}
+          </tbody>{extra_html}
+        </table>
+      </div>
+    </section>
+  </div>"""
 
 
 def write_html(data, template_path, out_path):
     """Inject generated project content into the HTML template."""
     template = template_path.read_text()
-    generated_at = fmt_dt(data["generated_at"])
+    now = data["generated_at"]
+    generated_at = now.strftime("%Y-%m-%d %H:%M:%S UTC")
 
     # Nav links
     nav_items = "".join(
@@ -284,10 +329,10 @@ def write_html(data, template_path, out_path):
         for p in data["projects"]
     )
 
-    # Project sections
-    sections = "".join(render_project_html(p) for p in data["projects"])
+    # Project sections (each is a col-* div)
+    sections = "".join(render_project_html(p, now) for p in data["projects"])
     if not sections:
-        sections = '<p class="text-muted">No projects configured. Edit <code>config.yaml</code>.</p>'
+        sections = '<div class="col-12"><p class="text-muted">No projects configured. Edit <code>config.yaml</code>.</p></div>'
 
     content = (template
         .replace("{{GENERATED_AT}}", generated_at)
