@@ -1,5 +1,16 @@
-fetched_at: '2026-04-06T11:00:00.518080+00:00'
+fetched_at: '2026-04-06T14:00:00Z'
 repo: marenamat/claude-dashboard
+summary:
+  total_failures: 12
+  all_on_main: true
+  last_run: '2026-04-06T09:13:42Z'
+  last_sha: 83df31f3
+  note: |
+    All 12 CI failures are on main. The wasm-pack fix (7d5b1e8) and
+    wasm-bindgen-cli version fix (877ff43) are both on origin/main and
+    CI still fails. Root cause unknown (403 on log downloads).
+    Diagnostic split-step CI is on issue-2-separate-nginx (29ac7eb)
+    but has not been pushed to trigger a new CI run.
 runs:
 - branch: main
   conclusion: failure
