@@ -15,6 +15,8 @@ WWW="$SELFDIR/www"
 BOOTSTRAP_VERSION="5.3.3"
 BOOTSTRAP_DIR="$WWW/bootstrap"
 
+PATH="$PATH:$HOME/.cargo/bin"
+
 # ---------------------------------------------------------------------------
 # 1. Bootstrap local mirror
 # ---------------------------------------------------------------------------
