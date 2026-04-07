@@ -12,3 +12,11 @@ maintenance_actions:
 - template_fetched
 - 'template_merged: clanker-prep, clanker-run, clanker-setup, .claude-base-files'
 recorded_at: '2026-04-07T05:55:00.357324+00:00'
+work_this_session:
+- branch: issue-4-compact-layout
+  commit: 8fa0a22
+  summary: >
+    Resolved rebase conflict between compact layout (issue #4) and limit_hit
+    detection (issue #5). Merged both: grid layout, colored dots, relative
+    dates, show-5+more, AND limit_hit row colouring + badge.
+  recorded_at: '2026-04-07T07:00:00+00:00'
