@@ -1,5 +1,42 @@
-fetched_at: '2026-04-07T07:55:00.484724+00:00'
+fetched_at: '2026-04-07T08:25:00.511702+00:00'
 issues:
+- author: marenamat
+  body: json logs are impossible to human-read verbatim, pretty-print them, as an
+    actual structure to be displayed, collapsible
+  comments: []
+  created_at: '2026-04-07T08:16:18Z'
+  labels: []
+  number: 10
+  title: display pretty logs
+- author: marenamat
+  body: 'Now build.sh runs in a cron and the website needs to be reloaded manually.
+    Instead, watch for updates and push them by websocket.
+
+
+    Also, show running clanker instances (as e.g. green color)'
+  comments: []
+  created_at: '2026-04-07T08:13:44Z'
+  labels: []
+  number: 9
+  title: Autoreload
+- author: marenamat
+  body: Show the times in the timezone of the browser.
+  comments: []
+  created_at: '2026-04-07T08:12:35Z'
+  labels: []
+  number: 8
+  title: Timezone
+- author: marenamat
+  body: 'Show up to 1280 log items, add "5 more", then "10 more", then "20 more",
+    exponentially.
+
+
+    Add a collapse button.'
+  comments: []
+  created_at: '2026-04-07T08:11:29Z'
+  labels: []
+  number: 7
+  title: More dashboard events
 - author: marenamat
   body: 'Draft requirements for `claude-base` so that they can implement fixes to
     `clanker-prep` and `clanker-run` scripts to make their output machine-readable.

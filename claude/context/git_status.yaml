@@ -3,12 +3,9 @@ branches:
 - main
 maintenance_actions:
 - fetched
-- 'rebased: issue-4-compact-layout'
+- main fast-forwarded
 - 'rebased: issue-6-machine-readable-outputs'
-- 'pruned: issue-4-compact-layout'
+- 'pruned: issue-6-machine-readable-outputs'
 - template_fetched
-- template_up_to_date
-recorded_at: '2026-04-07T07:55:00.484724+00:00'
-session_actions:
-- 'fixed: BigInt bug in src/lib.rs (now_secs i64->u32), fixes issue #4 regression'
-- 'verified: issue #6 implementation complete (generate-data.py + design doc)'
+- 'template_merged: clanker-prep, clanker-run, clanker-setup, .claude-base-files'
+recorded_at: '2026-04-07T08:25:00.511702+00:00'
