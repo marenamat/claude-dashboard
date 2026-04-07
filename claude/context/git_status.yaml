@@ -6,6 +6,7 @@ maintenance_actions:
 - main fast-forwarded
 - 'rebased: issue-4-compact-layout'
 - 'rebase_failed: issue-6-machine-readable-outputs'
+- 'pruned: issue-4-compact-layout'
 - template_fetched
 - template_up_to_date
 recorded_at: '2026-04-07T07:25:00.444611+00:00'
