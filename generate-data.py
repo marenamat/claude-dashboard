@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
-# generate-data.py: Read clanker.log files from configured projects,
+# generate-data.py: Read clanker run data from configured projects,
 # emit www/data.cbor and regenerate the static content in www/index.html.
+# Reads clanker-runs.jsonl (structured, preferred) or falls back to
+# clanker.log (legacy).  Also reads clanker-prep.json for prep metadata.
 # Requires: cbor2 (pip install cbor2)
 
+import json
 import os
 import re
 import sys
@@ -128,6 +131,78 @@ def parse_log(log_path):
     return runs[:MAX_RUNS]
 
 
+def _parse_iso(s):
+    """Parse an ISO 8601 string (with offset) into a timezone-aware datetime, or None."""
+    if not s:
+        return None
+    try:
+        # Python 3.11+ handles this natively; handle +00:00 suffix for older versions
+        return datetime.fromisoformat(s)
+    except (ValueError, TypeError):
+        return None
+
+
+def parse_jsonl(jsonl_path):
+    """Parse a clanker-runs.jsonl file into a list of run dicts.
+
+    Each JSON line must have at minimum a "start" field (ISO 8601).
+    Unknown fields are ignored so older parsers stay forward-compatible.
+    """
+    try:
+        text = jsonl_path.read_text(errors="replace")
+    except OSError as e:
+        print(f"  Warning: cannot read {jsonl_path}: {e}", file=sys.stderr)
+        return []
+
+    runs = []
+    for lineno, raw in enumerate(text.splitlines(), 1):
+        raw = raw.strip()
+        if not raw:
+            continue
+        try:
+            rec = json.loads(raw)
+        except json.JSONDecodeError as e:
+            print(f"  Warning: {jsonl_path}:{lineno}: JSON parse error: {e}", file=sys.stderr)
+            continue
+
+        start = _parse_iso(rec.get("start"))
+        if start is None:
+            print(f"  Warning: {jsonl_path}:{lineno}: missing/invalid 'start', skipping", file=sys.stderr)
+            continue
+
+        runs.append({
+            "start":      start,
+            "end":        _parse_iso(rec.get("end")),
+            "invoked":    bool(rec.get("invoked", False)),
+            "limit_hit":  bool(rec.get("limit_hit", False)),
+            "cost_usd":   rec.get("cost_usd"),       # float or None
+            "tokens_in":  rec.get("tokens_in"),      # int or None
+            "tokens_out": rec.get("tokens_out"),     # int or None
+            "exit_code":  rec.get("exit_code"),      # int or None
+            "log":        rec.get("log_excerpt", ""),
+        })
+
+    # Newest first, cap
+    runs.sort(key=lambda r: r["start"], reverse=True)
+    return runs[:MAX_RUNS]
+
+
+def parse_prep(prep_path):
+    """Read clanker-prep.json and return a dict with prep metadata, or None."""
+    if not prep_path.exists():
+        return None
+    try:
+        with open(prep_path) as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError) as e:
+        print(f"  Warning: cannot read {prep_path}: {e}", file=sys.stderr)
+        return None
+    return {
+        "decision": data.get("decision", ""),
+        "reasons":  data.get("reasons", []),
+    }
+
+
 # ---------------------------------------------------------------------------
 # Data collection
 # ---------------------------------------------------------------------------
@@ -137,13 +212,28 @@ def collect(config):
     projects = []
     for entry in config.get("projects", []):
         path = Path(entry["path"]).expanduser()
-        log_path = path / "clanker.log"
         name = entry.get("name") or path.name
-        runs = parse_log(log_path) if log_path.exists() else []
+
+        jsonl_path = path / "clanker-runs.jsonl"
+        log_path   = path / "clanker.log"
+
+        # Prefer structured JSONL; fall back to legacy log parsing
+        if jsonl_path.exists():
+            print(f"  {name}: reading structured {jsonl_path.name}")
+            runs = parse_jsonl(jsonl_path)
+        elif log_path.exists():
+            print(f"  {name}: reading legacy {log_path.name}")
+            runs = parse_log(log_path)
+        else:
+            runs = []
+
+        prep = parse_prep(path / "clanker-prep.json")
+
         projects.append({
             "name": name,
             "path": str(path),
             "runs": runs,
+            "prep": prep,   # None or {"decision": ..., "reasons": [...]}
         })
     return {
         "generated_at": datetime.now(timezone.utc),
@@ -266,6 +356,26 @@ def render_run_row(run, now):
       </tr>"""
 
 
+def render_prep_html(prep):
+    """Render a small prep-decision snippet, or return empty string."""
+    if not prep:
+        return ""
+    decision = html.escape(prep.get("decision", ""))
+    reasons  = prep.get("reasons", [])
+    if not decision:
+        return ""
+    badge_class = "bg-success" if decision == "INVOKE_CLAUDE" else "bg-secondary"
+    reasons_html = ""
+    if reasons:
+        items = "".join(f"<li>{html.escape(r)}</li>" for r in reasons)
+        reasons_html = f'<ul class="mb-0 small">{items}</ul>'
+    return (
+        f'<p class="mb-1 small">'
+        f'<span class="badge {badge_class} me-1">prep: {decision}</span>'
+        f'</p>{reasons_html}'
+    )
+
+
 def render_project_html(proj, now):
     """Render HTML for one project section wrapped in a Bootstrap column div."""
     name = html.escape(proj["name"])
@@ -292,11 +402,14 @@ def render_project_html(proj, now):
         <button class="btn btn-link btn-sm p-0 show-more-btn" data-target="{tbid}">Show {n} more\u2026</button>
       </td></tr></tfoot>"""
 
+    prep_html = render_prep_html(proj.get("prep"))
+
     return f"""
   <div class="col-12 col-md-6 col-xl-4 col-xxl-3">
     <section class="project-section h-100" id="proj-{proj_id}">
       <h2 class="h5">{name}</h2>
       <p class="text-muted small mb-2">{path}</p>
+      {prep_html}
       <div class="table-responsive">
         <table class="table table-sm table-bordered table-hover align-middle mb-0">
           <thead class="table-dark">
@@ -360,7 +473,8 @@ def main():
     print("Collecting data...")
     data = collect(config)
     for proj in data["projects"]:
-        print(f"  {proj['name']}: {len(proj['runs'])} run(s)")
+        prep_str = f", prep={proj['prep']['decision']}" if proj.get("prep") else ""
+        print(f"  {proj['name']}: {len(proj['runs'])} run(s){prep_str}")
 
     print("Writing CBOR...")
     write_cbor(data, WWW / "data.cbor")

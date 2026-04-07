@@ -1,22 +1,17 @@
 branches:
-- issue-4-compact-layout
+- issue-6-machine-readable-outputs
 - main
 maintenance_actions:
 - fetched
 - main fast-forwarded
-- 'rebase_failed: issue-4-compact-layout'
-- 'rebased: issue-5-tokens-limits'
-- 'rebased: issue-6-machine-readable-reqs'
-- 'pruned: issue-5-tokens-limits'
-- 'pruned: issue-6-machine-readable-reqs'
+- 'rebased: issue-4-compact-layout'
+- 'rebase_failed: issue-6-machine-readable-outputs'
 - template_fetched
-- 'template_merged: clanker-prep, clanker-run, clanker-setup, .claude-base-files'
-recorded_at: '2026-04-07T05:55:00.357324+00:00'
+- template_up_to_date
+recorded_at: '2026-04-07T07:25:00.444611+00:00'
 work_this_session:
-- branch: issue-4-compact-layout
-  commit: 8fa0a22
-  summary: >
-    Resolved rebase conflict between compact layout (issue #4) and limit_hit
-    detection (issue #5). Merged both: grid layout, colored dots, relative
-    dates, show-5+more, AND limit_hit row colouring + badge.
-  recorded_at: '2026-04-07T07:00:00+00:00'
+- description: >
+    Resolved rebase conflict for issue-6-machine-readable-outputs onto main.
+    Merged compact layout (grid columns, inv-dot, relative dates, show-5+more)
+    with machine-readable output features (JSONL parsing, prep.json, render_prep).
+  recorded_at: '2026-04-07T07:40:00+00:00'

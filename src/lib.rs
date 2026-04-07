@@ -221,10 +221,28 @@ struct RunView {
   log: String,
 }
 
+struct PrepView {
+  decision: String,
+  reasons:  Vec<String>,
+}
+
 struct ProjectView {
   name: String,
   path: String,
   runs: Vec<RunView>,
+  prep: Option<PrepView>,
+}
+
+fn parse_prep(v: &ciborium::value::Value) -> PrepView {
+  let map = val_as_map(v);
+  let decision = val_as_str(&map, "decision");
+  let reasons = match map.get("reasons") {
+    Some(ciborium::value::Value::Array(arr)) => arr.iter().filter_map(|item| {
+      if let ciborium::value::Value::Text(s) = item { Some(s.clone()) } else { None }
+    }).collect(),
+    _ => vec![],
+  };
+  PrepView { decision, reasons }
 }
 
 fn parse_project(v: &ciborium::value::Value) -> ProjectView {
@@ -235,7 +253,12 @@ fn parse_project(v: &ciborium::value::Value) -> ProjectView {
     Some(ciborium::value::Value::Array(arr)) => arr.iter().map(parse_run).collect(),
     _ => vec![],
   };
-  ProjectView { name, path, runs }
+  // prep is an optional map
+  let prep = match map.get("prep") {
+    Some(v @ ciborium::value::Value::Map(_)) => Some(parse_prep(v)),
+    _ => None,
+  };
+  ProjectView { name, path, runs, prep }
 }
 
 fn parse_run(v: &ciborium::value::Value) -> RunView {
@@ -313,6 +336,25 @@ fn render_run_row(run: &RunView, now_secs: i64) -> String {
 
 const SHOW_INITIAL: usize = 5;
 
+fn render_prep(prep: &PrepView) -> String {
+  // Badge colour: green for INVOKE_CLAUDE, grey otherwise
+  let badge_class = if prep.decision == "INVOKE_CLAUDE" { "bg-success" } else { "bg-secondary" };
+  let reasons_html: String = if prep.reasons.is_empty() {
+    String::new()
+  } else {
+    let items: String = prep.reasons.iter()
+      .map(|r| format!("<li>{}</li>", esc(r)))
+      .collect();
+    format!(r#"<ul class="mb-0 small">{items}</ul>"#)
+  };
+  format!(
+    r#"<p class="mb-1 small"><span class="badge {badge_class} me-1">prep: {decision}</span></p>{reasons}"#,
+    badge_class = badge_class,
+    decision = esc(&prep.decision),
+    reasons = reasons_html,
+  )
+}
+
 fn render_project(proj: &ProjectView, now_secs: i64) -> String {
   let visible = &proj.runs[..proj.runs.len().min(SHOW_INITIAL)];
   let extra   = if proj.runs.len() > SHOW_INITIAL { &proj.runs[SHOW_INITIAL..] } else { &[] };
@@ -339,11 +381,14 @@ fn render_project(proj: &ProjectView, now_secs: i64) -> String {
     String::new()
   };
 
+  let prep_html = proj.prep.as_ref().map(render_prep).unwrap_or_default();
+
   format!(
     r#"<div class="col-12 col-md-6 col-xl-4 col-xxl-3">
 <section class="project-section h-100" id="proj-{id}">
   <h2 class="h5">{name}</h2>
   <p class="text-muted small mb-2">{path}</p>
+  {prep_html}
   <div class="table-responsive">
     <table class="table table-sm table-bordered table-hover align-middle mb-0">
       <thead class="table-dark">
@@ -363,6 +408,7 @@ fn render_project(proj: &ProjectView, now_secs: i64) -> String {
     id   = esc(&proj.name),
     name = esc(&proj.name),
     path = esc(&proj.path),
+    prep_html = prep_html,
     rows = visible_rows,
     extra = extra_html,
   )

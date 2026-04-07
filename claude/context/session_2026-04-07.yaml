@@ -1,0 +1,32 @@
+date: '2026-04-07'
+
+summary: |
+  Maintenance + issue-6 implementation session.
+
+  Status:
+  - issue-4 (compact layout): complete on branch issue-4-compact-layout; awaiting
+    human guardian push/merge.
+  - issue-5 (tokens & limits): dashboard side already complete (rate-limit badge,
+    token/cost display in generate-data.py). The stream-json integration is documented
+    in design/machine-readable-outputs.md (issue #6 design). No separate branch needed
+    for the dashboard.
+  - issue-6 (machine-readable outputs): design doc written. Dashboard integration now
+    implemented on branch issue-6-machine-readable-outputs.
+
+  issue-6-machine-readable-outputs branch changes:
+  - generate-data.py: added parse_jsonl() and parse_prep() functions.
+    collect() now prefers clanker-runs.jsonl over clanker.log (fallback).
+    Also reads clanker-prep.json for prep decision/reasons.
+    Both pieces of data are emitted in the CBOR and in the static HTML.
+  - src/lib.rs: added PrepView struct, parse_prep(), render_prep().
+    ProjectView now carries Option<PrepView>.
+    render_project() shows a prep decision badge with reasons list.
+
+  Pipeline: all green on main (last runs at 2026-04-07T05:26Z).
+  Open issues: #4, #5, #6 (all by marenamat).
+
+  Next steps (for human guardian):
+  - Push/merge issue-4-compact-layout.
+  - Push issue-6-machine-readable-outputs so CI validates the Rust changes.
+  - claude-base needs to implement clanker-runs.jsonl and clanker-prep.json
+    emission (design/machine-readable-outputs.md has the spec).
