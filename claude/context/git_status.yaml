@@ -3,16 +3,12 @@ branches:
 - main
 maintenance_actions:
 - fetched
-- main fast-forwarded
 - 'rebased: issue-4-compact-layout'
-- 'rebase_failed: issue-6-machine-readable-outputs'
+- 'rebased: issue-6-machine-readable-outputs'
 - 'pruned: issue-4-compact-layout'
 - template_fetched
 - template_up_to_date
-recorded_at: '2026-04-07T07:25:00.444611+00:00'
-work_this_session:
-- description: >
-    Resolved rebase conflict for issue-6-machine-readable-outputs onto main.
-    Merged compact layout (grid columns, inv-dot, relative dates, show-5+more)
-    with machine-readable output features (JSONL parsing, prep.json, render_prep).
-  recorded_at: '2026-04-07T07:40:00+00:00'
+recorded_at: '2026-04-07T07:55:00.484724+00:00'
+session_actions:
+- 'fixed: BigInt bug in src/lib.rs (now_secs i64->u32), fixes issue #4 regression'
+- 'verified: issue #6 implementation complete (generate-data.py + design doc)'

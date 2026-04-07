@@ -420,9 +420,11 @@ fn render_project(proj: &ProjectView, now_secs: i64) -> String {
 
 /// Render dashboard HTML from raw CBOR bytes.
 /// now_secs: current UTC epoch seconds (from JS Date.now()/1000) for relative timestamps.
+/// u32 maps to a plain JS number; i64 would require BigInt on the JS side.
 /// Returns an HTML string on success, or an error message prefixed with "ERROR:".
 #[wasm_bindgen]
-pub fn render_dashboard(cbor_bytes: &[u8], now_secs: i64) -> String {
+pub fn render_dashboard(cbor_bytes: &[u8], now_secs: u32) -> String {
+  let now_secs = now_secs as i64;
   match decode_data(cbor_bytes) {
     Err(e) => format!("ERROR: {e}"),
     Ok((generated_at, projects)) => {
