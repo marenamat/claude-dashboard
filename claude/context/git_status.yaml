@@ -1,20 +1,14 @@
 branches:
-- main
 - issue-4-compact-layout
-- issue-5-tokens-limits
-- issue-6-machine-readable-reqs
+- main
 maintenance_actions:
 - fetched
+- main fast-forwarded
+- 'rebase_failed: issue-4-compact-layout'
+- 'rebased: issue-5-tokens-limits'
+- 'rebased: issue-6-machine-readable-reqs'
+- 'pruned: issue-5-tokens-limits'
+- 'pruned: issue-6-machine-readable-reqs'
 - template_fetched
-- template_up_to_date
-recorded_at: '2026-04-06T21:25:00.980205+00:00'
-work_this_session:
-- branch: issue-4-compact-layout
-  commit: 026a49a
-  summary: Grid layout, invoked dot, relative dates, show-5+more (issue #4)
-- branch: issue-5-tokens-limits
-  commit: 2d2934f
-  summary: Rate-limit hit detection and warning badge (issue #5)
-- branch: issue-6-machine-readable-reqs
-  commit: 5f7ffea
-  summary: Draft machine-readable output requirements for claude-base (issue #6)
+- 'template_merged: clanker-prep, clanker-run, clanker-setup, .claude-base-files'
+recorded_at: '2026-04-07T05:55:00.357324+00:00'
