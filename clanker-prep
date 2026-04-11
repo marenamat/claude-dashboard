@@ -109,7 +109,14 @@ def do_git_maintenance():
         if rc == 0:
             actions.append("main fast-forwarded")
         else:
-            actions.append(f"main ff failed: {err}")
+            # ff-only failed (diverging histories) — try rebase instead
+            print(f"ff-only failed, trying rebase of main onto {remote}/main", file=sys.stderr)
+            _, err2, rc2 = run(f"git rebase {remote}/main")
+            if rc2 == 0:
+                actions.append(f"main rebased onto {remote}/main")
+            else:
+                run("git rebase --abort")
+                actions.append(f"main_rebase_failed: {err2}")
         if current and current != "main":
             run(f"git checkout {current}")
 
@@ -361,7 +368,7 @@ def fetch_issues(repo):
             print(f"Comments fetch error for #{i['number']}: {cerr}", file=sys.stderr)
         elif comments:
             entry["comments"] = [
-                {"author": c["user"]["login"], "body": c["body"]}
+                {"id": c["id"], "author": c["user"]["login"], "body": c["body"]}
                 for c in comments
             ]
         result.append(entry)
@@ -423,7 +430,8 @@ def main():
 
     # Rebase failures need Claude to resolve conflicts
     for action in git_actions:
-        if action.startswith("rebase_failed:") or action.startswith("template_merge_failed:"):
+        if (action.startswith("rebase_failed:") or action.startswith("template_merge_failed:")
+                or action.startswith("main_rebase_failed:")):
             reasons.append(action)
 
     # --- Detect repo ---
@@ -433,7 +441,18 @@ def main():
         reasons.append("cannot detect GitHub repo - manual check needed")
 
     # --- Issues ---
+    # Load previously seen comment IDs to detect new comments on handled issues.
+    seen_comments_path = context_dir / "seen_issue_comment_ids.yaml"
+    if seen_comments_path.exists():
+        with open(seen_comments_path) as f:
+            seen_comments_data = yaml.safe_load(f) or {}
+        # Keys are stored as ints in YAML but may load as strings; normalise to int.
+        seen_comment_ids = {int(k): set(v) for k, v in seen_comments_data.get("seen_ids", {}).items()}
+    else:
+        seen_comment_ids = {}
+
     issues_ctx = {"fetched_at": now, "repo": repo, "issues": []}
+    fetched_issue_ids = []
     if repo:
         print(f"Fetching issues for {repo}...", file=sys.stderr)
         issues, err = fetch_issues(repo)
@@ -441,11 +460,33 @@ def main():
             reasons.append(f"issue fetch failed: {err}")
         elif issues is not None:
             issues_ctx["issues"] = issues
+            fetched_issue_ids = [i["number"] for i in issues]
+            # Check which issues are referenced in recent main commits
+            recent_log, _, _ = run("git log main --oneline -100")
             for issue in issues:
                 num = issue["number"]
-                # If no branch references this issue number, it's unhandled
-                if not any(str(num) in b for b in existing_branches):
+                # Handled if a branch references the issue number
+                branch_handled = any(str(num) in b for b in existing_branches)
+                # Also handled if a recent main commit references the issue number
+                commit_handled = f"#{num}" in recent_log or f"issue-{num}" in recent_log
+
+                # Check for new comments regardless of handled state
+                current_cids = {c["id"] for c in issue.get("comments", [])}
+                prev_cids = seen_comment_ids.get(num, set())
+                new_cids = current_cids - prev_cids
+                # Remember all comment IDs seen this run
+                seen_comment_ids[num] = current_cids
+
+                if not branch_handled and not commit_handled:
                     reasons.append(f"unhandled issue #{num}: {issue['title']}")
+                elif new_cids:
+                    # Issue has a branch or commit, but new comments were posted
+                    reasons.append(f"new comment(s) on issue #{num}: {issue['title']}")
+
+    # Persist seen comment IDs so future runs only trigger on truly new comments.
+    seen_ids_to_save = {k: sorted(v) for k, v in seen_comment_ids.items()}
+    with open(seen_comments_path, "w") as f:
+        yaml.dump({"seen_ids": seen_ids_to_save}, f, default_flow_style=False)
 
     with open(context_dir / "github_issues.yaml", "w") as f:
         yaml.dump(issues_ctx, f, default_flow_style=False, allow_unicode=True)
@@ -461,6 +502,7 @@ def main():
         seen_ids = set()
 
     pipeline_ctx = {"fetched_at": now, "repo": repo, "runs": []}
+    fetched_pipeline_ids = []
     if repo:
         print("Fetching pipeline results...", file=sys.stderr)
         runs, err = fetch_pipelines(repo)
@@ -468,6 +510,7 @@ def main():
             print(f"Pipeline fetch skipped: {err}", file=sys.stderr)
         elif runs is not None:
             pipeline_ctx["runs"] = runs
+            fetched_pipeline_ids = [r["id"] for r in runs]
             for r in runs:
                 if r["id"] not in seen_ids:
                     # Only trigger on failures we haven't seen before
@@ -486,6 +529,21 @@ def main():
         yaml.dump({"seen_ids": seen_list}, f, default_flow_style=False)
 
     # --- Decision ---
+    decision = "INVOKE_CLAUDE" if reasons else "NOTHING_TO_DO"
+
+    # Write machine-readable prep summary (overwritten each run)
+    prep_summary = {
+        "recorded_at": now,
+        "decision": decision,
+        "reasons": reasons,
+        "fetched_issues": fetched_issue_ids,
+        "fetched_pipelines": fetched_pipeline_ids,
+        "git_actions": git_actions,
+    }
+    with open(selfdir / "clanker-prep.json", "w") as f:
+        json.dump(prep_summary, f, indent=2)
+        f.write("\n")
+
     if reasons:
         print(f"Invoking Claude. Reasons: {reasons}", file=sys.stderr)
         print("INVOKE_CLAUDE")

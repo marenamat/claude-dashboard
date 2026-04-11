@@ -44,19 +44,91 @@ restart_flag="$selfdir/.clanker-restart-$$"
 
   echo "Prep decision: $decision" >>clanker.log
 
+  # Record start time; defaults used when claude is not invoked
+  start_time=$(date -u +"%Y-%m-%dT%H:%M:%S+00:00")
+  invoked=false
+  exit_code=-1
+  tmp_out=$(mktemp)
+
   if $force || [ "$decision" = "INVOKE_CLAUDE" ]; then
+    invoked=true
+    # Run with stream-json so we can extract cost/token data
     ~/.local/bin/claude \
       -n "$selfdir" \
       --no-session-persistence \
+      --output-format=stream-json \
+      --verbose \
       "proceed as the workflow specifies in CLAUDE.md" \
-      </dev/null >>clanker.log 2>&1 || exit_code=$?
+      </dev/null >"$tmp_out" 2>&1 || exit_code=$?
     exit_code=${exit_code:-0}
+
+    # Append raw stream output to log (=== header and date were written above)
+    cat "$tmp_out" >>clanker.log
     case "$exit_code" in
       0)  date >>clanker.log ;;
       *)  date >>clanker.log
           echo "exit status $exit_code" >>clanker.log ;;
     esac
   fi
+
+  # Append one JSON record to clanker-runs.jsonl
+  end_time=$(date -u +"%Y-%m-%dT%H:%M:%S+00:00")
+  python3 - "$start_time" "$end_time" "$invoked" "$exit_code" "$tmp_out" \
+    >>"$selfdir/clanker-runs.jsonl" <<'PYEOF' || true
+import sys, json, re
+
+start, end, invoked_str, exit_code_str, tmp_path = sys.argv[1:]
+invoked = invoked_str == "true"
+exit_code = int(exit_code_str)
+
+cost_usd = None
+tokens_in = None
+tokens_out = None
+limit_hit = False
+log_lines = []
+
+try:
+    with open(tmp_path) as f:
+        log_lines = f.readlines()
+    for line in log_lines:
+        s = line.strip()
+        # Text fallback for rate limit detection
+        if re.search(r"you.ve hit your limit", s, re.I):
+            limit_hit = True
+        try:
+            obj = json.loads(s)
+            if obj.get("type") == "result":
+                cost_usd = obj.get("cost_usd")
+                usage = obj.get("usage", {})
+                tokens_in = usage.get("input_tokens")
+                tokens_out = usage.get("output_tokens")
+                # Reliable rate-limit detection from structured result
+                err_msg = str(obj.get("error", ""))
+                if obj.get("subtype") == "error" and re.search(r"limit", err_msg, re.I):
+                    limit_hit = True
+        except Exception:
+            pass
+except Exception:
+    pass
+
+excerpt = "".join(log_lines[-40:]).rstrip("\n") if log_lines else ""
+
+record = {
+    "start":       start,
+    "end":         end,
+    "invoked":     invoked,
+    "exit_code":   exit_code,
+    "cost_usd":    cost_usd,
+    "tokens_in":   tokens_in,
+    "tokens_out":  tokens_out,
+    "limit_hit":   limit_hit,
+    "log_excerpt": excerpt,
+}
+print(json.dumps(record))
+PYEOF
+
+  rm -f "$tmp_out"
+
 ) 200>clanker.lock
 
 # The flock subshell has released the lock. If a restart was requested,
