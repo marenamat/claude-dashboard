@@ -222,7 +222,73 @@
     return "";
   }
 
+  // ---------------------------------------------------------------------------
+  // Running-state overlay (issue #9)
+  //
+  // runningProjects tracks which project names currently have clanker running.
+  // After every render we re-apply the 'running' class so it survives re-renders.
+  // ---------------------------------------------------------------------------
+  var runningProjects = new Set();
+
+  function setRunning(name, running) {
+    if (running) runningProjects.add(name);
+    else runningProjects.delete(name);
+    applyRunning();
+  }
+
+  function applyRunning() {
+    runningProjects.forEach(function(name) {
+      var section = document.getElementById("proj-" + name);
+      if (section) section.classList.add("running");
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // WebSocket autoreload (issue #9)
+  //
+  // Connects to /ws on the same host.  On "data-updated" re-fetches and
+  // re-renders the dashboard.  On "running" toggles the visual indicator.
+  // Reconnects automatically after a 5-second delay on disconnect.
+  // ---------------------------------------------------------------------------
+  var wsRendering = false;  // guard against concurrent re-renders
+
+  function connectWebSocket() {
+    var proto = location.protocol === "https:" ? "wss:" : "ws:";
+    var url = proto + "//" + location.host + "/ws";
+    var ws;
+    try {
+      ws = new WebSocket(url);
+    } catch (e) {
+      // WebSocket not available — no autoreload, degrade silently
+      return;
+    }
+
+    ws.onmessage = function(ev) {
+      var msg;
+      try { msg = JSON.parse(ev.data); } catch (e) { return; }
+
+      if (msg.type === "data-updated") {
+        if (!wsRendering) {
+          wsRendering = true;
+          run().finally(function() { wsRendering = false; });
+        }
+      } else if (msg.type === "running") {
+        setRunning(msg.name, msg.running);
+      }
+    };
+
+    ws.onclose = function() {
+      setTimeout(connectWebSocket, 5000);
+    };
+
+    ws.onerror = function() {
+      ws.close();
+    };
+  }
+
+  // ---------------------------------------------------------------------------
   // Fetch data.cbor as ArrayBuffer
+  // ---------------------------------------------------------------------------
   function fetchData() {
     return fetch(DATA_URL).then(function(r) {
       if (!r.ok) throw new Error(`HTTP ${r.status} fetching ${DATA_URL}`);
@@ -237,6 +303,9 @@
     });
   }
 
+  // run() fetches data + renders the dashboard.  Returns a Promise so callers
+  // (e.g. the WebSocket handler) can chain on completion.  WASM is cached by
+  // the browser module cache after the first load.
   function run() {
     showLoading();
 
@@ -245,7 +314,7 @@
     // Browser UTC offset in seconds: positive = east of UTC (e.g. UTC+1 → +3600)
     const tzOffsetSecs = -(new Date().getTimezoneOffset()) * 60;
 
-    Promise.all([fetchData(), loadWasm()])
+    return Promise.all([fetchData(), loadWasm()])
       .then(function([buf, wasm]) {
         const bytes = new Uint8Array(buf);
         const html = wasm.render_dashboard(bytes, nowSecs, tzOffsetSecs);
@@ -276,6 +345,10 @@
           wireShowMore(content);
           wireLogPrettyPrint(content);
         }
+
+        // Re-apply running indicators that may have arrived via WebSocket
+        // before or during this render (issue #9)
+        applyRunning();
       })
       .catch(function(err) {
         // WASM unavailable or data missing: leave static HTML in place.
@@ -289,12 +362,18 @@
           );
           wireShowMore(content);
           wireLogPrettyPrint(content);
+          applyRunning();
         }
       });
   }
 
-  if (document.readyState === "loading")
-    document.addEventListener("DOMContentLoaded", run);
-  else
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", function() {
+      run();
+      connectWebSocket();
+    });
+  } else {
     run();
+    connectWebSocket();
+  }
 }());

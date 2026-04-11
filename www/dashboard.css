@@ -153,6 +153,30 @@ tr.table-warning td:first-child {
   border-top: 1px solid #343a40;
 }
 
+/* Running clanker instance indicator (issue #9).
+   Applied by JS when ws-server.py reports clanker.lock is present. */
+.project-section.running {
+  border-color: #198754;
+}
+
+.project-section.running h2 {
+  border-bottom-color: #198754;
+}
+
+/* Green pulsing dot appended after the project name */
+.project-section.running h2::after {
+  content: " \25CF";  /* ● black circle */
+  color: #198754;
+  font-size: 0.55em;
+  vertical-align: middle;
+  animation: running-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes running-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.35; }
+}
+
 /* Loading/error overlay injected by JS */
 #dash-loading {
   text-align: center;
