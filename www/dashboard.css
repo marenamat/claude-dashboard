@@ -66,6 +66,84 @@ tr.table-warning td:first-child {
   font-size: 0.8rem;
 }
 
+/* Pretty log: replaces the raw <pre> when JS can parse JSONL (issue #10) */
+.log-pretty {
+  margin-top: 0.5rem;
+  border: 1px solid #343a40;
+  border-radius: 0.25rem;
+  overflow: hidden;
+  font-size: 0.75rem;
+}
+
+.log-record {
+  border-bottom: 1px solid #343a40;
+  background: #212529;
+}
+
+.log-record:last-child {
+  border-bottom: none;
+}
+
+.log-record > summary {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  padding: 0.3rem 0.6rem;
+  cursor: pointer;
+  color: #adb5bd;
+  user-select: none;
+  list-style: none;  /* hide default marker */
+}
+
+.log-record > summary::before {
+  content: "▶";
+  font-size: 0.6rem;
+  color: #6c757d;
+  flex-shrink: 0;
+}
+
+.log-record[open] > summary::before {
+  content: "▼";
+}
+
+/* Type badge inside log summary */
+.log-type-badge {
+  font-weight: bold;
+  font-size: 0.7rem;
+  padding: 0.1rem 0.35rem;
+  border-radius: 0.2rem;
+  white-space: nowrap;
+}
+
+.log-type-system   { background: #495057; color: #dee2e6; }
+.log-type-assistant { background: #0d6efd; color: #fff; }
+.log-type-user     { background: #198754; color: #fff; }
+.log-type-result   { background: #198754; color: #fff; }
+.log-type-result-error { background: #dc3545; color: #fff; }
+.log-type-rate-limit { background: #ffc107; color: #212529; }
+.log-type-other    { background: #6c757d; color: #fff; }
+
+.log-record-excerpt {
+  color: #adb5bd;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.log-record > pre {
+  background: #1a1e21;
+  color: #6ea8fe;
+  font-size: 0.7rem;
+  padding: 0.5rem 0.75rem;
+  margin: 0;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  border-top: 1px solid #343a40;
+}
+
 /* Loading/error overlay injected by JS */
 #dash-loading {
   text-align: center;

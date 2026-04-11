@@ -95,6 +95,133 @@
     });
   }
 
+  // Pretty-print JSONL log snippets (issue #10).
+  //
+  // Finds every .log-snippet <pre> inside root, tries to parse its content as
+  // JSONL (one JSON object per line).  If successful, replaces the <pre> with a
+  // <div class="log-pretty"> containing one collapsible <details> per record.
+  //
+  // Falls back silently to the raw <pre> if the content is not valid JSONL.
+  function wireLogPrettyPrint(root) {
+    root.querySelectorAll("pre.log-snippet").forEach(function(pre) {
+      var raw = pre.textContent.trim();
+      if (!raw) return;
+
+      var lines = raw.split("\n").filter(function(l) { return l.trim(); });
+      var records = [];
+      for (var i = 0; i < lines.length; i++) {
+        try {
+          records.push(JSON.parse(lines[i]));
+        } catch (e) {
+          // Not valid JSONL — leave the pre as-is
+          return;
+        }
+      }
+      if (records.length === 0) return;
+
+      var div = document.createElement("div");
+      div.className = "log-pretty";
+      records.forEach(function(rec) {
+        div.appendChild(buildLogRecord(rec));
+      });
+
+      // Replace the <details> containing the pre (to hide the old "show" summary)
+      var details = pre.closest("details");
+      if (details) {
+        details.replaceWith(div);
+      } else {
+        pre.replaceWith(div);
+      }
+    });
+  }
+
+  // Build a <details class="log-record"> for one JSONL record.
+  function buildLogRecord(rec) {
+    var det = document.createElement("details");
+    det.className = "log-record";
+
+    var sum = document.createElement("summary");
+
+    // Type badge
+    var badge = document.createElement("span");
+    badge.className = "log-type-badge " + logTypeBadgeClass(rec);
+    badge.textContent = logTypeLabel(rec);
+    sum.appendChild(badge);
+
+    // Excerpt
+    var exc = document.createElement("span");
+    exc.className = "log-record-excerpt";
+    exc.textContent = logExcerpt(rec);
+    sum.appendChild(exc);
+
+    det.appendChild(sum);
+
+    // Full JSON in a pre, shown when expanded
+    var pre = document.createElement("pre");
+    pre.textContent = JSON.stringify(rec, null, 2);
+    det.appendChild(pre);
+
+    return det;
+  }
+
+  // Determine CSS badge class for a log record type.
+  function logTypeBadgeClass(rec) {
+    var t = rec.type || "";
+    var s = rec.subtype || "";
+    if (t === "assistant")      return "log-type-assistant";
+    if (t === "user")           return "log-type-user";
+    if (t === "system")         return "log-type-system";
+    if (t === "rate_limit_event") return "log-type-rate-limit";
+    if (t === "result") {
+      return (s === "error" || rec.is_error) ? "log-type-result-error" : "log-type-result";
+    }
+    return "log-type-other";
+  }
+
+  // Short human-readable type label for the badge.
+  function logTypeLabel(rec) {
+    var t = rec.type || "?";
+    var s = rec.subtype;
+    if (s) return t + "/" + s;
+    if (t === "rate_limit_event") return "rate limit";
+    return t;
+  }
+
+  // One-line excerpt summarising the record content.
+  function logExcerpt(rec) {
+    var t = rec.type || "";
+    if (t === "system" && rec.subtype === "init") {
+      return "model: " + (rec.model || "?") + "  cwd: " + (rec.cwd || "?");
+    }
+    if (t === "assistant") {
+      // Pull first text block from the message
+      var msg = rec.message;
+      if (msg && Array.isArray(msg.content)) {
+        for (var i = 0; i < msg.content.length; i++) {
+          var blk = msg.content[i];
+          if (blk.type === "text" && blk.text) {
+            return blk.text.replace(/\s+/g, " ").slice(0, 120);
+          }
+        }
+      }
+      if (rec.error) return "error: " + String(rec.error).slice(0, 100);
+      return "";
+    }
+    if (t === "result") {
+      var parts = [];
+      if (rec.subtype) parts.push(rec.subtype);
+      if (rec.num_turns != null) parts.push(rec.num_turns + " turns");
+      if (rec.duration_ms != null) parts.push((rec.duration_ms / 1000).toFixed(1) + "s");
+      return parts.join("  ");
+    }
+    if (t === "rate_limit_event") {
+      var info = rec.rate_limit_info;
+      if (info && info.resets_at) return "resets at " + info.resets_at;
+      return "";
+    }
+    return "";
+  }
+
   // Fetch data.cbor as ArrayBuffer
   function fetchData() {
     return fetch(DATA_URL).then(function(r) {
@@ -147,6 +274,7 @@
         if (content && sections) {
           content.innerHTML = sections.innerHTML;
           wireShowMore(content);
+          wireLogPrettyPrint(content);
         }
       })
       .catch(function(err) {
@@ -160,6 +288,7 @@
              </div>`
           );
           wireShowMore(content);
+          wireLogPrettyPrint(content);
         }
       });
   }
