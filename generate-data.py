@@ -12,6 +12,8 @@ import sys
 import html
 import cbor2
 import yaml
+import urllib.request
+import xml.etree.ElementTree as ET
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
@@ -128,8 +130,9 @@ def parse_log(log_path):
         if run["start"] is not None:
             runs.append(run)
 
+    # Newest first; caller is responsible for capping (issue #11)
     runs.sort(key=lambda r: r["start"], reverse=True)
-    return runs[:MAX_RUNS]
+    return runs
 
 
 def _parse_iso(s):
@@ -183,9 +186,9 @@ def parse_jsonl(jsonl_path):
             "log":        rec.get("log_excerpt", ""),
         })
 
-    # Newest first, cap
+    # Newest first; caller is responsible for capping
     runs.sort(key=lambda r: r["start"], reverse=True)
-    return runs[:MAX_RUNS]
+    return runs
 
 
 def parse_prep(prep_path):
@@ -208,8 +211,66 @@ def parse_prep(prep_path):
 # Data collection
 # ---------------------------------------------------------------------------
 
+def fetch_exchange_rates():
+    """Fetch USD→EUR and USD→CZK rates from ECB.
+
+    Returns {"usd_to_eur": float, "usd_to_czk": float}.
+    Falls back to hardcoded approximations if the request fails.
+    ECB gives rates relative to EUR (e.g. USD rate = how many USD per 1 EUR).
+    """
+    try:
+        url = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml"
+        req = urllib.request.Request(url, headers={"Accept": "application/xml"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            xml_data = resp.read()
+        root = ET.fromstring(xml_data)
+        ns = {"ns": "http://www.ecb.int/vocabulary/2002-08-01/eurofxref"}
+        ecb_rates = {}
+        for cube in root.findall(".//ns:Cube[@currency]", ns):
+            ecb_rates[cube.get("currency")] = float(cube.get("rate"))
+        usd_per_eur = ecb_rates.get("USD", 1.09)
+        czk_per_eur = ecb_rates.get("CZK", 25.2)
+        rates = {
+            "usd_to_eur": 1.0 / usd_per_eur,
+            "usd_to_czk": czk_per_eur / usd_per_eur,
+        }
+        print(f"  Exchange rates: 1 USD = {rates['usd_to_eur']:.4f} EUR = {rates['usd_to_czk']:.3f} CZK")
+        return rates
+    except Exception as e:
+        print(f"  Warning: ECB rate fetch failed ({e}); using hardcoded fallback", file=sys.stderr)
+        return {"usd_to_eur": 0.92, "usd_to_czk": 23.0}
+
+
+def compute_token_stats(runs, now):
+    """Compute token/cost totals over last day, last week, and lifetime.
+
+    Uses ALL runs (not the display-capped slice) for accurate lifetime figures.
+    Returns {"day": {...}, "week": {...}, "life": {...}} where each bucket has
+    tokens_in, tokens_out, cost_usd.
+    """
+    day_cutoff  = now - timedelta(hours=24)
+    week_cutoff = now - timedelta(days=7)
+
+    def agg(subset):
+        t_in  = sum(r["tokens_in"]  or 0 for r in subset)
+        t_out = sum(r["tokens_out"] or 0 for r in subset)
+        cost  = sum(r["cost_usd"]   or 0.0 for r in subset)
+        return {"tokens_in": t_in, "tokens_out": t_out, "cost_usd": cost}
+
+    return {
+        "day":  agg([r for r in runs if r["start"] and r["start"] >= day_cutoff]),
+        "week": agg([r for r in runs if r["start"] and r["start"] >= week_cutoff]),
+        "life": agg(runs),
+    }
+
+
 def collect(config):
     """Collect data from all configured project paths."""
+    now = datetime.now(timezone.utc)
+
+    print("Fetching exchange rates...")
+    exchange_rates = fetch_exchange_rates()
+
     projects = []
     for entry in config.get("projects", []):
         path = Path(entry["path"]).expanduser()
@@ -221,24 +282,29 @@ def collect(config):
         # Prefer structured JSONL; fall back to legacy log parsing
         if jsonl_path.exists():
             print(f"  {name}: reading structured {jsonl_path.name}")
-            runs = parse_jsonl(jsonl_path)
+            all_runs = parse_jsonl(jsonl_path)
         elif log_path.exists():
             print(f"  {name}: reading legacy {log_path.name}")
-            runs = parse_log(log_path)
+            all_runs = parse_log(log_path)
         else:
-            runs = []
+            all_runs = []
+
+        # Compute stats from ALL runs before capping for display (issue #11)
+        token_stats = compute_token_stats(all_runs, now)
 
         prep = parse_prep(path / "clanker-prep.json")
 
         projects.append({
-            "name": name,
-            "path": str(path),
-            "runs": runs,
-            "prep": prep,   # None or {"decision": ..., "reasons": [...]}
+            "name":         name,
+            "path":         str(path),
+            "runs":         all_runs[:MAX_RUNS],
+            "prep":         prep,          # None or {"decision": ..., "reasons": [...]}
+            "token_stats":  token_stats,   # day/week/life token+cost totals (issue #11)
         })
     return {
-        "generated_at": datetime.now(timezone.utc),
-        "projects": projects,
+        "generated_at":   now,
+        "exchange_rates": exchange_rates,
+        "projects":       projects,
     }
 
 
@@ -386,7 +452,58 @@ def render_prep_html(prep):
     )
 
 
-def render_project_html(proj, now):
+def render_token_stats_html(stats, rates):
+    """Render a compact token-statistics table (issue #11).
+
+    stats: {"day": {...}, "week": {...}, "life": {...}}
+    rates: {"usd_to_eur": float, "usd_to_czk": float}
+    """
+    if not stats:
+        return ""
+    usd_to_eur = rates.get("usd_to_eur", 0.92)
+    usd_to_czk = rates.get("usd_to_czk", 23.0)
+
+    def fmt_tokens(n):
+        if n == 0:
+            return "—"
+        if n >= 1_000_000:
+            return f"{n/1_000_000:.1f}M"
+        if n >= 1_000:
+            return f"{n/1_000:.1f}k"
+        return str(n)
+
+    def fmt_money(usd):
+        if usd == 0.0:
+            return "—"
+        eur = usd * usd_to_eur
+        czk = usd * usd_to_czk
+        return (f'<span title="${usd:.4f} / €{eur:.4f} / {czk:.2f} Kč">'
+                f'${usd:.3f} / €{eur:.3f} / {czk:.1f} Kč</span>')
+
+    rows = ""
+    for label, key in (("day", "day"), ("week", "week"), ("lifetime", "life")):
+        b = stats.get(key, {})
+        t_in  = b.get("tokens_in",  0) or 0
+        t_out = b.get("tokens_out", 0) or 0
+        cost  = b.get("cost_usd",  0.0) or 0.0
+        rows += (
+            f'<tr><td class="text-muted small">{label}</td>'
+            f'<td class="text-end small">{fmt_tokens(t_in + t_out)}</td>'
+            f'<td class="small">{fmt_money(cost)}</td></tr>'
+        )
+
+    return f"""
+      <table class="table table-sm table-borderless mb-1 token-stats">
+        <thead class="table-secondary"><tr>
+          <th class="small py-0">period</th>
+          <th class="small py-0 text-end">tokens</th>
+          <th class="small py-0">cost (USD / EUR / CZK)</th>
+        </tr></thead>
+        <tbody>{rows}</tbody>
+      </table>"""
+
+
+def render_project_html(proj, now, rates=None):
     """Render HTML for one project section wrapped in a Bootstrap column div."""
     name = html.escape(proj["name"])
     path = html.escape(proj["path"])
@@ -417,7 +534,8 @@ def render_project_html(proj, now):
         </td></tr>
       </tfoot>"""
 
-    prep_html = render_prep_html(proj.get("prep"))
+    prep_html  = render_prep_html(proj.get("prep"))
+    stats_html = render_token_stats_html(proj.get("token_stats"), rates or {})
 
     return f"""
   <div class="col-12 col-md-6 col-xl-4 col-xxl-3">
@@ -425,6 +543,7 @@ def render_project_html(proj, now):
       <h2 class="h5">{name}</h2>
       <p class="text-muted small mb-2">{path}</p>
       {prep_html}
+      {stats_html}
       <div class="table-responsive">
         <table class="table table-sm table-bordered table-hover align-middle mb-0">
           <thead class="table-dark">
@@ -458,7 +577,8 @@ def write_html(data, template_path, out_path):
     )
 
     # Project sections (each is a col-* div)
-    sections = "".join(render_project_html(p, now) for p in data["projects"])
+    rates = data.get("exchange_rates", {})
+    sections = "".join(render_project_html(p, now, rates) for p in data["projects"])
     if not sections:
         sections = '<div class="col-12"><p class="text-muted">No projects configured. Edit <code>config.yaml</code>.</p></div>'
 

@@ -66,6 +66,15 @@ tr.table-warning td:first-child {
   font-size: 0.8rem;
 }
 
+/* Token statistics mini-table (issue #11) */
+.token-stats {
+  font-size: 0.8rem;
+}
+
+.token-stats th, .token-stats td {
+  padding: 0.15rem 0.4rem;
+}
+
 /* Pretty log: replaces the raw <pre> when JS can parse JSONL (issue #10) */
 .log-pretty {
   margin-top: 0.5rem;

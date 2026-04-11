@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 // CBOR deserialisation helpers
 // ---------------------------------------------------------------------------
 
-fn decode_data(bytes: &[u8]) -> Result<(String, Vec<ProjectView>), String> {
+fn decode_data(bytes: &[u8]) -> Result<(String, ExchangeRates, Vec<ProjectView>), String> {
   let value: ciborium::value::Value = ciborium::de::from_reader(bytes)
     .map_err(|e| format!("CBOR parse error: {e}"))?;
 
@@ -27,12 +27,24 @@ fn decode_data(bytes: &[u8]) -> Result<(String, Vec<ProjectView>), String> {
   let generated_at = extract_text_or_tag(&top, "generated_at")
     .unwrap_or_default();
 
+  // Exchange rates are optional; default to safe fallback values (issue #11)
+  let rates = match top.get("exchange_rates") {
+    Some(v) => {
+      let rm = val_as_map(v);
+      ExchangeRates {
+        usd_to_eur: val_as_f64(&rm, "usd_to_eur").unwrap_or(0.92),
+        usd_to_czk: val_as_f64(&rm, "usd_to_czk").unwrap_or(23.0),
+      }
+    }
+    None => ExchangeRates { usd_to_eur: 0.92, usd_to_czk: 23.0 },
+  };
+
   let projects = match top.get("projects") {
     Some(ciborium::value::Value::Array(arr)) => arr.iter().map(parse_project).collect(),
     _ => vec![],
   };
 
-  Ok((generated_at, projects))
+  Ok((generated_at, rates, projects))
 }
 
 fn extract_text_or_tag(
@@ -236,11 +248,31 @@ struct PrepView {
   reasons:  Vec<String>,
 }
 
+// One time-bucket of token statistics (issue #11)
+struct TokenBucket {
+  tokens_in:  u64,
+  tokens_out: u64,
+  cost_usd:   f64,
+}
+
+struct TokenStats {
+  day:  TokenBucket,
+  week: TokenBucket,
+  life: TokenBucket,
+}
+
+// Exchange rates fetched from ECB at build time (issue #11)
+struct ExchangeRates {
+  usd_to_eur: f64,
+  usd_to_czk: f64,
+}
+
 struct ProjectView {
-  name: String,
-  path: String,
-  runs: Vec<RunView>,
-  prep: Option<PrepView>,
+  name:        String,
+  path:        String,
+  runs:        Vec<RunView>,
+  prep:        Option<PrepView>,
+  token_stats: Option<TokenStats>,
 }
 
 fn parse_prep(v: &ciborium::value::Value) -> PrepView {
@@ -253,6 +285,27 @@ fn parse_prep(v: &ciborium::value::Value) -> PrepView {
     _ => vec![],
   };
   PrepView { decision, reasons }
+}
+
+fn parse_token_bucket(map: &BTreeMap<String, ciborium::value::Value>, key: &str) -> TokenBucket {
+  let inner = match map.get(key) {
+    Some(v) => val_as_map(v),
+    None => BTreeMap::new(),
+  };
+  TokenBucket {
+    tokens_in:  val_as_u64(&inner, "tokens_in").unwrap_or(0),
+    tokens_out: val_as_u64(&inner, "tokens_out").unwrap_or(0),
+    cost_usd:   val_as_f64(&inner, "cost_usd").unwrap_or(0.0),
+  }
+}
+
+fn parse_token_stats(v: &ciborium::value::Value) -> TokenStats {
+  let map = val_as_map(v);
+  TokenStats {
+    day:  parse_token_bucket(&map, "day"),
+    week: parse_token_bucket(&map, "week"),
+    life: parse_token_bucket(&map, "life"),
+  }
 }
 
 fn parse_project(v: &ciborium::value::Value) -> ProjectView {
@@ -268,7 +321,12 @@ fn parse_project(v: &ciborium::value::Value) -> ProjectView {
     Some(v @ ciborium::value::Value::Map(_)) => Some(parse_prep(v)),
     _ => None,
   };
-  ProjectView { name, path, runs, prep }
+  // token_stats is an optional map (issue #11)
+  let token_stats = match map.get("token_stats") {
+    Some(v @ ciborium::value::Value::Map(_)) => Some(parse_token_stats(v)),
+    _ => None,
+  };
+  ProjectView { name, path, runs, prep, token_stats }
 }
 
 fn parse_run(v: &ciborium::value::Value) -> RunView {
@@ -372,7 +430,55 @@ fn render_prep(prep: &PrepView) -> String {
   )
 }
 
-fn render_project(proj: &ProjectView, now_secs: i64, tz_offset_secs: i64) -> String {
+fn fmt_tokens(n: u64) -> String {
+  if n == 0 { return "—".into(); }
+  if n >= 1_000_000 { return format!("{:.1}M", n as f64 / 1_000_000.0); }
+  if n >= 1_000     { return format!("{:.1}k", n as f64 / 1_000.0); }
+  n.to_string()
+}
+
+fn fmt_money(usd: f64, rates: &ExchangeRates) -> String {
+  if usd == 0.0 { return "—".into(); }
+  let eur = usd * rates.usd_to_eur;
+  let czk = usd * rates.usd_to_czk;
+  format!("${usd:.3} / €{eur:.3} / {czk:.1} Kč")
+}
+
+fn render_token_stats(stats: &TokenStats, rates: &ExchangeRates) -> String {
+  let buckets = [
+    ("day",      &stats.day),
+    ("week",     &stats.week),
+    ("lifetime", &stats.life),
+  ];
+  let rows: String = buckets.iter().map(|(label, b)| {
+    let tokens = b.tokens_in + b.tokens_out;
+    format!(
+      r#"<tr>
+        <td class="text-muted small">{label}</td>
+        <td class="text-end small">{tok}</td>
+        <td class="small">{cost}</td>
+      </tr>"#,
+      label = label,
+      tok   = fmt_tokens(tokens),
+      cost  = esc(&fmt_money(b.cost_usd, rates)),
+    )
+  }).collect();
+  format!(
+    r#"<table class="table table-sm table-borderless mb-1 token-stats">
+      <thead class="table-secondary">
+        <tr>
+          <th class="small py-0">period</th>
+          <th class="small py-0 text-end">tokens</th>
+          <th class="small py-0">cost (USD / EUR / CZK)</th>
+        </tr>
+      </thead>
+      <tbody>{rows}</tbody>
+    </table>"#,
+    rows = rows,
+  )
+}
+
+fn render_project(proj: &ProjectView, now_secs: i64, tz_offset_secs: i64, rates: &ExchangeRates) -> String {
   // Cap total runs at SHOW_MAX (issue #7)
   let all_runs = &proj.runs[..proj.runs.len().min(SHOW_MAX)];
   let total = all_runs.len();
@@ -404,7 +510,10 @@ fn render_project(proj: &ProjectView, now_secs: i64, tz_offset_secs: i64) -> Str
     String::new()
   };
 
-  let prep_html = proj.prep.as_ref().map(render_prep).unwrap_or_default();
+  let prep_html  = proj.prep.as_ref().map(render_prep).unwrap_or_default();
+  let stats_html = proj.token_stats.as_ref()
+    .map(|s| render_token_stats(s, rates))
+    .unwrap_or_default();
 
   format!(
     r#"<div class="col-12 col-md-6 col-xl-4 col-xxl-3">
@@ -412,6 +521,7 @@ fn render_project(proj: &ProjectView, now_secs: i64, tz_offset_secs: i64) -> Str
   <h2 class="h5">{name}</h2>
   <p class="text-muted small mb-2">{path}</p>
   {prep_html}
+  {stats_html}
   <div class="table-responsive">
     <table class="table table-sm table-bordered table-hover align-middle mb-0">
       <thead class="table-dark">
@@ -429,14 +539,15 @@ fn render_project(proj: &ProjectView, now_secs: i64, tz_offset_secs: i64) -> Str
   </div>
 </section>
 </div>"#,
-    id       = esc(&proj.name),
-    name     = esc(&proj.name),
-    path     = esc(&proj.path),
-    prep_html = prep_html,
-    tbody_id = tbody_id,
-    initial  = SHOW_INITIAL,
-    rows     = rows,
-    tfoot    = tfoot_html,
+    id         = esc(&proj.name),
+    name       = esc(&proj.name),
+    path       = esc(&proj.path),
+    prep_html  = prep_html,
+    stats_html = stats_html,
+    tbody_id   = tbody_id,
+    initial    = SHOW_INITIAL,
+    rows       = rows,
+    tfoot      = tfoot_html,
   )
 }
 
@@ -455,8 +566,8 @@ pub fn render_dashboard(cbor_bytes: &[u8], now_secs: u32, tz_offset_secs: i32) -
   let tz_offset_secs = tz_offset_secs as i64;
   match decode_data(cbor_bytes) {
     Err(e) => format!("ERROR: {e}"),
-    Ok((generated_at, projects)) => {
-      let sections: String = projects.iter().map(|p| render_project(p, now_secs, tz_offset_secs)).collect();
+    Ok((generated_at, rates, projects)) => {
+      let sections: String = projects.iter().map(|p| render_project(p, now_secs, tz_offset_secs, &rates)).collect();
       let nav: String = projects.iter().map(|p|
         format!(r##"<li class="nav-item"><a class="nav-link" href="#proj-{id}">{name}</a></li>"##,
           id = esc(&p.name), name = esc(&p.name))
