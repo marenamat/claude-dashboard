@@ -162,36 +162,46 @@ fn epoch_to_weekday(secs: i64) -> usize {
   ((days + 4).rem_euclid(7)) as usize
 }
 
-// Format a run timestamp relative to now_secs (UTC).
-// - same day  → "today HH:MM"
-// - 1 day ago → "yesterday HH:MM"
-// - 2–5 days  → "weekday HH:MM"
-// - older     → "Apr 01, HH:MM"
-fn fmt_ts_relative(ts: &str, now_secs: i64) -> String {
-  // Extract "HH:MM" from the raw ISO string
-  let hhmm = if ts.len() >= 16 { &ts[11..16] } else { "" };
-
+// Format a run timestamp relative to now_secs in the browser's local timezone.
+// tz_offset_secs: local UTC offset in seconds (positive = east of UTC), e.g. +3600 for UTC+1.
+// - same local day  → "today HH:MM"
+// - 1 day ago       → "yesterday HH:MM"
+// - 2–5 days        → "weekday HH:MM"
+// - older           → "Apr 01, HH:MM"
+fn fmt_ts_relative(ts: &str, now_secs: i64, tz_offset_secs: i64) -> String {
   let ts_secs = match parse_timestamp_secs(ts) {
     Some(v) => v,
-    None => return if !hhmm.is_empty() { format!("{} {}", &ts[0..10], hhmm) } else { ts.to_owned() },
+    // Fallback: can't parse; show raw date+time portion unchanged
+    None => return if ts.len() >= 16 { format!("{} {}", &ts[0..10], &ts[11..16]) } else { ts.to_owned() },
   };
 
-  let ts_day  = ts_secs.div_euclid(86400);
-  let now_day = now_secs.div_euclid(86400);
+  // Shift both timestamps into local time for day boundary comparisons
+  let local_ts  = ts_secs  + tz_offset_secs;
+  let local_now = now_secs + tz_offset_secs;
+
+  // HH:MM from local epoch seconds
+  let day_secs = local_ts.rem_euclid(86400);
+  let hh = day_secs / 3600;
+  let mm = (day_secs % 3600) / 60;
+  let hhmm = format!("{:02}:{:02}", hh, mm);
+
+  let ts_day  = local_ts.div_euclid(86400);
+  let now_day = local_now.div_euclid(86400);
   let days_ago = now_day - ts_day;
 
   const WEEKDAYS: [&str; 7] = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
   const MONTHS:   [&str; 12] = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
   match days_ago {
-    0          => format!("today {hhmm}"),
-    1          => format!("yesterday {hhmm}"),
-    2..=5 => {
-      let wd = epoch_to_weekday(ts_secs);
+    0      => format!("today {hhmm}"),
+    1      => format!("yesterday {hhmm}"),
+    2..=5  => {
+      // Weekday of the local timestamp
+      let wd = epoch_to_weekday(local_ts);
       format!("{} {hhmm}", WEEKDAYS[wd])
     }
     _ => {
-      let (_, m, d) = epoch_to_ymd(ts_secs);
+      let (_, m, d) = epoch_to_ymd(local_ts);
       format!("{} {:02}, {hhmm}", MONTHS[(m - 1) as usize], d)
     }
   }
@@ -303,11 +313,11 @@ fn esc(s: &str) -> String {
    .replace('"', "&quot;")
 }
 
-fn render_run_row(run: &RunView, now_secs: i64, hidden: bool) -> String {
+fn render_run_row(run: &RunView, now_secs: i64, tz_offset_secs: i64, hidden: bool) -> String {
   let start_disp = if run.start_raw.is_empty() {
     "—".to_owned()
   } else {
-    fmt_ts_relative(&run.start_raw, now_secs)
+    fmt_ts_relative(&run.start_raw, now_secs, tz_offset_secs)
   };
   // Build row class: colour + optional hidden marker for JS progressive reveal
   let mut classes: Vec<&str> = Vec::new();
@@ -362,7 +372,7 @@ fn render_prep(prep: &PrepView) -> String {
   )
 }
 
-fn render_project(proj: &ProjectView, now_secs: i64) -> String {
+fn render_project(proj: &ProjectView, now_secs: i64, tz_offset_secs: i64) -> String {
   // Cap total runs at SHOW_MAX (issue #7)
   let all_runs = &proj.runs[..proj.runs.len().min(SHOW_MAX)];
   let total = all_runs.len();
@@ -371,7 +381,7 @@ fn render_project(proj: &ProjectView, now_secs: i64) -> String {
     r#"<tr><td colspan="5" class="text-muted">No runs recorded.</td></tr>"#.into()
   } else {
     all_runs.iter().enumerate()
-      .map(|(i, r)| render_run_row(r, now_secs, i >= SHOW_INITIAL))
+      .map(|(i, r)| render_run_row(r, now_secs, tz_offset_secs, i >= SHOW_INITIAL))
       .collect()
   };
 
@@ -435,16 +445,18 @@ fn render_project(proj: &ProjectView, now_secs: i64) -> String {
 // ---------------------------------------------------------------------------
 
 /// Render dashboard HTML from raw CBOR bytes.
-/// now_secs: current UTC epoch seconds (from JS Date.now()/1000) for relative timestamps.
-/// u32 maps to a plain JS number; i64 would require BigInt on the JS side.
+/// now_secs: current UTC epoch seconds (from JS Date.now()/1000). u32 avoids BigInt.
+/// tz_offset_secs: browser UTC offset in seconds (positive = east of UTC).
+///   Pass -(new Date().getTimezoneOffset()) * 60 from JS. i32 covers ±12 h = ±43200 s.
 /// Returns an HTML string on success, or an error message prefixed with "ERROR:".
 #[wasm_bindgen]
-pub fn render_dashboard(cbor_bytes: &[u8], now_secs: u32) -> String {
+pub fn render_dashboard(cbor_bytes: &[u8], now_secs: u32, tz_offset_secs: i32) -> String {
   let now_secs = now_secs as i64;
+  let tz_offset_secs = tz_offset_secs as i64;
   match decode_data(cbor_bytes) {
     Err(e) => format!("ERROR: {e}"),
     Ok((generated_at, projects)) => {
-      let sections: String = projects.iter().map(|p| render_project(p, now_secs)).collect();
+      let sections: String = projects.iter().map(|p| render_project(p, now_secs, tz_offset_secs)).collect();
       let nav: String = projects.iter().map(|p|
         format!(r##"<li class="nav-item"><a class="nav-link" href="#proj-{id}">{name}</a></li>"##,
           id = esc(&p.name), name = esc(&p.name))

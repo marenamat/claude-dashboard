@@ -115,11 +115,13 @@
 
     // Current UTC epoch seconds for relative timestamp display
     const nowSecs = Math.floor(Date.now() / 1000);
+    // Browser UTC offset in seconds: positive = east of UTC (e.g. UTC+1 → +3600)
+    const tzOffsetSecs = -(new Date().getTimezoneOffset()) * 60;
 
     Promise.all([fetchData(), loadWasm()])
       .then(function([buf, wasm]) {
         const bytes = new Uint8Array(buf);
-        const html = wasm.render_dashboard(bytes, nowSecs);
+        const html = wasm.render_dashboard(bytes, nowSecs, tzOffsetSecs);
 
         if (html.startsWith("ERROR:")) {
           showError(html.slice(6).trim());

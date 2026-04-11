@@ -272,7 +272,10 @@ MONTHS   = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct"
 
 
 def fmt_dt_relative(dt, now):
-    """Format a datetime relative to now.
+    """Format a datetime relative to now (UTC — static fallback only).
+
+    The JS/WASM path uses the browser timezone (issue #8); this function only
+    runs for the no-JS static fallback so UTC is acceptable.
 
     - same day        → "today HH:MM"
     - 1 day ago       → "yesterday HH:MM"
