@@ -303,14 +303,19 @@ fn esc(s: &str) -> String {
    .replace('"', "&quot;")
 }
 
-fn render_run_row(run: &RunView, now_secs: i64) -> String {
+fn render_run_row(run: &RunView, now_secs: i64, hidden: bool) -> String {
   let start_disp = if run.start_raw.is_empty() {
     "—".to_owned()
   } else {
     fmt_ts_relative(&run.start_raw, now_secs)
   };
-  // limit_hit takes priority over invoked for row colour
-  let row_class = if run.limit_hit { "table-danger" } else if run.invoked { "table-warning" } else { "" };
+  // Build row class: colour + optional hidden marker for JS progressive reveal
+  let mut classes: Vec<&str> = Vec::new();
+  if run.limit_hit      { classes.push("table-danger"); }
+  else if run.invoked   { classes.push("table-warning"); }
+  if hidden             { classes.push("run-hidden"); classes.push("d-none"); }
+  let row_class = classes.join(" ");
+
   let inv_class = if run.invoked { "inv-dot inv-yes" } else { "inv-dot inv-no" };
   let limit_badge = if run.limit_hit {
     r#" <span class="badge bg-danger ms-1" title="Hit rate limit">limit</span>"#
@@ -335,6 +340,8 @@ fn render_run_row(run: &RunView, now_secs: i64) -> String {
 }
 
 const SHOW_INITIAL: usize = 5;
+// Hard cap on runs displayed per project (issue #7)
+const SHOW_MAX: usize = 1280;
 
 fn render_prep(prep: &PrepView) -> String {
   // Badge colour: green for INVOKE_CLAUDE, grey otherwise
@@ -356,26 +363,32 @@ fn render_prep(prep: &PrepView) -> String {
 }
 
 fn render_project(proj: &ProjectView, now_secs: i64) -> String {
-  let visible = &proj.runs[..proj.runs.len().min(SHOW_INITIAL)];
-  let extra   = if proj.runs.len() > SHOW_INITIAL { &proj.runs[SHOW_INITIAL..] } else { &[] };
+  // Cap total runs at SHOW_MAX (issue #7)
+  let all_runs = &proj.runs[..proj.runs.len().min(SHOW_MAX)];
+  let total = all_runs.len();
 
-  let visible_rows: String = if visible.is_empty() {
+  let rows: String = if total == 0 {
     r#"<tr><td colspan="5" class="text-muted">No runs recorded.</td></tr>"#.into()
   } else {
-    visible.iter().map(|r| render_run_row(r, now_secs)).collect()
+    all_runs.iter().enumerate()
+      .map(|(i, r)| render_run_row(r, now_secs, i >= SHOW_INITIAL))
+      .collect()
   };
 
-  // Extra runs: second tbody hidden by default, revealed by "show more" button
-  let extra_html = if !extra.is_empty() {
-    let extra_rows: String = extra.iter().map(|r| render_run_row(r, now_secs)).collect();
-    let n    = extra.len();
-    let tbid = format!("extra-{}", esc(&proj.name));
+  // tbody carries data-initial so JS knows how many rows to keep when collapsing
+  let tbody_id = format!("tbody-{}", esc(&proj.name));
+
+  // Progressive reveal footer: show-more + collapse buttons (issue #7).
+  // JS reads data-batch (current next-batch size) and updates it after each click.
+  let tfoot_html = if total > SHOW_INITIAL {
     format!(
-      r#"<tbody id="{tbid}" class="d-none">{rows}</tbody>
-      <tfoot><tr><td colspan="5">
-        <button class="btn btn-link btn-sm p-0 show-more-btn" data-target="{tbid}">Show {n} more…</button>
-      </td></tr></tfoot>"#,
-      tbid = tbid, rows = extra_rows, n = n
+      r#"<tfoot class="runs-footer">
+        <tr><td colspan="5">
+          <button class="btn btn-link btn-sm p-0 show-more-btn" data-tbody="{tbid}" data-batch="5">5 more…</button>
+          <button class="btn btn-link btn-sm p-0 ms-2 collapse-runs-btn d-none" data-tbody="{tbid}">collapse</button>
+        </td></tr>
+      </tfoot>"#,
+      tbid = tbody_id,
     )
   } else {
     String::new()
@@ -400,17 +413,20 @@ fn render_project(proj: &ProjectView, now_secs: i64) -> String {
           <th>Log</th>
         </tr>
       </thead>
-      <tbody>{rows}</tbody>{extra}
+      <tbody id="{tbody_id}" data-initial="{initial}">{rows}</tbody>
+      {tfoot}
     </table>
   </div>
 </section>
 </div>"#,
-    id   = esc(&proj.name),
-    name = esc(&proj.name),
-    path = esc(&proj.path),
+    id       = esc(&proj.name),
+    name     = esc(&proj.name),
+    path     = esc(&proj.path),
     prep_html = prep_html,
-    rows = visible_rows,
-    extra = extra_html,
+    tbody_id = tbody_id,
+    initial  = SHOW_INITIAL,
+    rows     = rows,
+    tfoot    = tfoot_html,
   )
 }
 

@@ -28,17 +28,69 @@
       .replace(/>/g, "&gt;");
   }
 
-  // Wire up "show N more" buttons injected by WASM.
-  // Each button has data-target="<tbody id>"; clicking reveals that tbody
-  // and hides the button row.
+  // Wire up progressive "show more" / collapse buttons (issue #7).
+  //
+  // Each show-more button has:
+  //   data-tbody  — id of the tbody containing run rows
+  //   data-batch  — current batch size to reveal on next click (starts at 5,
+  //                 doubles after each click: 5, 10, 20, 40 …)
+  //
+  // Rows beyond SHOW_INITIAL are marked run-hidden + d-none by the WASM renderer.
+  // The collapse button re-hides all rows beyond data-initial on the tbody.
   function wireShowMore(root) {
     root.querySelectorAll(".show-more-btn").forEach(function(btn) {
       btn.addEventListener("click", function() {
-        const target = document.getElementById(btn.dataset.target);
-        if (target) target.classList.remove("d-none");
-        // Hide the tfoot containing this button
-        const tfoot = btn.closest("tfoot");
-        if (tfoot) tfoot.style.display = "none";
+        const tbody = document.getElementById(btn.dataset.tbody);
+        if (!tbody) return;
+
+        // Reveal up to `batch` hidden rows
+        var batch = parseInt(btn.dataset.batch) || 5;
+        var hidden = Array.from(tbody.querySelectorAll("tr.run-hidden"));
+        hidden.slice(0, batch).forEach(function(tr) {
+          tr.classList.remove("d-none", "run-hidden");
+        });
+
+        // Double the next batch size; cap at 1280
+        var nextBatch = Math.min(batch * 2, 1280);
+        btn.dataset.batch = nextBatch;
+
+        // Update button label or hide when nothing left
+        var remaining = tbody.querySelectorAll("tr.run-hidden").length;
+        if (remaining === 0) {
+          btn.classList.add("d-none");
+        } else {
+          var nextShow = Math.min(nextBatch, remaining);
+          btn.textContent = nextShow + " more\u2026";
+        }
+
+        // Show the collapse button (sibling in the same tfoot cell)
+        var collapseBtn = btn.closest("td").querySelector(".collapse-runs-btn");
+        if (collapseBtn) collapseBtn.classList.remove("d-none");
+      });
+    });
+
+    root.querySelectorAll(".collapse-runs-btn").forEach(function(btn) {
+      btn.addEventListener("click", function() {
+        const tbody = document.getElementById(btn.dataset.tbody);
+        if (!tbody) return;
+
+        // Re-hide all rows beyond the initial count
+        var initial = parseInt(tbody.dataset.initial) || 5;
+        var rows = Array.from(tbody.querySelectorAll("tr"));
+        rows.slice(initial).forEach(function(tr) {
+          tr.classList.add("d-none", "run-hidden");
+        });
+
+        // Reset show-more button
+        var showMore = btn.closest("td").querySelector(".show-more-btn");
+        if (showMore) {
+          showMore.dataset.batch = 5;
+          showMore.textContent = "5 more\u2026";
+          showMore.classList.remove("d-none");
+        }
+
+        // Hide collapse button
+        btn.classList.add("d-none");
       });
     });
   }

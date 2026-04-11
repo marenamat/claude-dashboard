@@ -25,6 +25,7 @@ WWW = SELFDIR / "www"
 MAX_LOG_LINES = 40   # log lines kept per run
 MAX_RUNS = 50        # most recent runs kept per project
 SHOW_INITIAL = 5     # runs shown by default; rest behind "show more"
+SHOW_MAX = 1280      # hard cap on runs displayed per project (issue #7)
 
 
 # ---------------------------------------------------------------------------
@@ -326,15 +327,21 @@ def fmt_cost(run):
     return "—"
 
 
-def render_run_row(run, now):
-    """Render one <tr> for a run."""
+def render_run_row(run, now, hidden=False):
+    """Render one <tr> for a run.
+
+    hidden=True marks the row with run-hidden d-none so JS can progressively
+    reveal it (issue #7).
+    """
     # limit_hit takes priority over invoked for row colour
+    classes = []
     if run.get("limit_hit"):
-        tr_class = "table-danger"
+        classes.append("table-danger")
     elif run["invoked"]:
-        tr_class = "table-warning"
-    else:
-        tr_class = ""
+        classes.append("table-warning")
+    if hidden:
+        classes.extend(["run-hidden", "d-none"])
+    tr_class = " ".join(classes)
     inv_class = "inv-dot inv-yes" if run["invoked"] else "inv-dot inv-no"
     inv_title = "Invoked" if run["invoked"] else "Not invoked"
     limit_badge = ('<span class="badge bg-danger ms-1" title="Hit rate limit">limit</span>'
@@ -381,26 +388,31 @@ def render_project_html(proj, now):
     name = html.escape(proj["name"])
     path = html.escape(proj["path"])
     proj_id = html.escape(proj["name"])
-    runs = proj["runs"]
+    # Cap at SHOW_MAX (issue #7)
+    runs = proj["runs"][:SHOW_MAX]
+    total = len(runs)
 
-    visible = runs[:SHOW_INITIAL]
-    extra   = runs[SHOW_INITIAL:]
+    if total == 0:
+        all_rows = '<tr><td colspan="5" class="text-muted">No runs recorded.</td></tr>'
+    else:
+        all_rows = "".join(
+            render_run_row(r, now, hidden=(i >= SHOW_INITIAL))
+            for i, r in enumerate(runs)
+        )
 
-    visible_rows = "".join(render_run_row(r, now) for r in visible) if visible else \
-        '<tr><td colspan="5" class="text-muted">No runs recorded.</td></tr>'
+    tbody_id = html.escape(f"tbody-{proj['name']}")
 
-    # Extra runs: second tbody hidden by default (no JS = stays hidden)
-    extra_html = ""
-    if extra:
-        extra_rows = "".join(render_run_row(r, now) for r in extra)
-        n    = len(extra)
-        tbid = html.escape(f"extra-{proj['name']}")
-        extra_html = f"""
-      <tbody id="{tbid}" class="d-none">{extra_rows}
-      </tbody>
-      <tfoot><tr><td colspan="5">
-        <button class="btn btn-link btn-sm p-0 show-more-btn" data-target="{tbid}">Show {n} more\u2026</button>
-      </td></tr></tfoot>"""
+    # Progressive reveal tfoot: show-more + collapse (issue #7).
+    # Without JS the hidden rows stay hidden — same fallback behaviour as before.
+    tfoot_html = ""
+    if total > SHOW_INITIAL:
+        tfoot_html = f"""
+      <tfoot class="runs-footer">
+        <tr><td colspan="5">
+          <button class="btn btn-link btn-sm p-0 show-more-btn" data-tbody="{tbody_id}" data-batch="5">5 more\u2026</button>
+          <button class="btn btn-link btn-sm p-0 ms-2 collapse-runs-btn d-none" data-tbody="{tbody_id}">collapse</button>
+        </td></tr>
+      </tfoot>"""
 
     prep_html = render_prep_html(proj.get("prep"))
 
@@ -421,8 +433,8 @@ def render_project_html(proj, now):
               <th>Log</th>
             </tr>
           </thead>
-          <tbody>{visible_rows}
-          </tbody>{extra_html}
+          <tbody id="{tbody_id}" data-initial="{SHOW_INITIAL}">{all_rows}
+          </tbody>{tfoot_html}
         </table>
       </div>
     </section>
