@@ -1,11 +1,17 @@
 branches:
-- issue-6-machine-readable-outputs
+- issue-10-pretty-logs
+- issue-11-token-stats
+- issue-7-more-dashboard-events
+- issue-8-timezone
+- issue-9-autoreload
 - main
 maintenance_actions:
 - fetched
-- main fast-forwarded
-- 'rebased: issue-6-machine-readable-outputs'
-- 'pruned: issue-6-machine-readable-outputs'
+- 'rebased: issue-7-more-dashboard-events onto main'
+- 'rebased: issue-8-timezone onto issue-7-more-dashboard-events'
+- 'rebased: issue-10-pretty-logs onto issue-8-timezone'
+- 'rebased: issue-11-token-stats onto issue-10-pretty-logs'
+- 'rebased: issue-9-autoreload onto issue-11-token-stats'
 - template_fetched
-- 'template_merged: clanker-prep, clanker-run, clanker-setup, .claude-base-files'
-recorded_at: '2026-04-07T08:25:00.511702+00:00'
+- template_up_to_date
+recorded_at: '2026-04-12T00:25:00.334075+00:00'

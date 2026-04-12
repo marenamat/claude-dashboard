@@ -1,4 +1,4 @@
-fetched_at: '2026-04-07T08:25:00.511702+00:00'
+fetched_at: '2026-04-12T00:25:00.334075+00:00'
 issues:
 - author: marenamat
   body: json logs are impossible to human-read verbatim, pretty-print them, as an
@@ -77,10 +77,12 @@ issues:
   - author: marenamat
     body: 'also the date may be just "today 20:15", "yesterday 15:05", "friday 8:43"
       etc., up to 5 days ago, where it should be like Apr 01, 13:28 '
+    id: 4194609827
   - author: marenamat
     body: "after merging, the dashboard stopped working\n\n```\n Live rendering unavailable\
       \ (can't convert 1775547184 to BigInt). Showing static data.\nLoading dashboard\
       \ data…\n```"
+    id: 4197292248
   created_at: '2026-04-06T19:37:57Z'
   labels: []
   number: 4

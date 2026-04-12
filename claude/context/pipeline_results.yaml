@@ -1,6 +1,42 @@
-fetched_at: '2026-04-07T08:25:00.511702+00:00'
+fetched_at: '2026-04-12T00:25:00.334075+00:00'
 repo: marenamat/claude-dashboard
 runs:
+- branch: main
+  conclusion: success
+  created_at: '2026-04-11T22:40:10Z'
+  id: 24293217541
+  name: Deploy
+  status: completed
+- branch: main
+  conclusion: success
+  created_at: '2026-04-11T22:40:10Z'
+  id: 24293217539
+  name: Build
+  status: completed
+- branch: main
+  conclusion: success
+  created_at: '2026-04-11T22:29:02Z'
+  id: 24293032775
+  name: Deploy
+  status: completed
+- branch: main
+  conclusion: success
+  created_at: '2026-04-11T22:29:02Z'
+  id: 24293032770
+  name: Build
+  status: completed
+- branch: main
+  conclusion: success
+  created_at: '2026-04-07T12:34:49Z'
+  id: 24081580498
+  name: Build
+  status: completed
+- branch: main
+  conclusion: success
+  created_at: '2026-04-07T12:34:49Z'
+  id: 24081580455
+  name: Deploy
+  status: completed
 - branch: main
   conclusion: success
   created_at: '2026-04-07T08:04:56Z'
@@ -84,40 +120,4 @@ runs:
   created_at: '2026-04-06T16:31:26Z'
   id: 24040292810
   name: Build
-  status: completed
-- branch: main
-  conclusion: failure
-  created_at: '2026-04-06T12:33:32Z'
-  id: 24031955101
-  name: Build
-  status: completed
-- branch: main
-  conclusion: failure
-  created_at: '2026-04-06T12:33:32Z'
-  id: 24031955097
-  name: Deploy
-  status: completed
-- branch: main
-  conclusion: failure
-  created_at: '2026-04-06T11:51:31Z'
-  id: 24030726974
-  name: Deploy
-  status: completed
-- branch: main
-  conclusion: failure
-  created_at: '2026-04-06T11:51:31Z'
-  id: 24030726945
-  name: Build
-  status: completed
-- branch: main
-  conclusion: failure
-  created_at: '2026-04-06T11:31:23Z'
-  id: 24030167377
-  name: Build
-  status: completed
-- branch: main
-  conclusion: failure
-  created_at: '2026-04-06T11:31:23Z'
-  id: 24030167359
-  name: Deploy
   status: completed
