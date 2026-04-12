@@ -7,11 +7,19 @@ branches:
 - main
 maintenance_actions:
 - fetched
-- 'rebased: issue-7-more-dashboard-events onto main'
-- 'rebased: issue-8-timezone onto issue-7-more-dashboard-events'
-- 'rebased: issue-10-pretty-logs onto issue-8-timezone'
-- 'rebased: issue-11-token-stats onto issue-10-pretty-logs'
-- 'rebased: issue-9-autoreload onto issue-11-token-stats'
+- main fast-forwarded
 - template_fetched
 - template_up_to_date
-recorded_at: '2026-04-12T00:25:00.334075+00:00'
+- 'rebase_ok: issue-7-more-dashboard-events (conflict in claude/questions.md, resolved
+  by taking main version)'
+- 'rebase_ok: issue-8-timezone (same conflict, resolved same way)'
+- 'rebase_ok: issue-10-pretty-logs (same conflict, resolved same way)'
+- 'rebase_ok: issue-11-token-stats (same conflict, resolved same way)'
+- 'rebase_ok: issue-9-autoreload (two conflicts: questions.md stale-resolved sections
+  dropped; issue-9 question for websockets package preserved)'
+notes:
+- issue #4 (layout, BigInt, invoked dot) fully implemented in main
+- issue #6 design spec written in claude/design/machine-readable-outputs.md; waiting
+  on claude-base implementation
+- issues 7/8/9/10/11 have feature branches rebased and ready for PR
+recorded_at: '2026-04-12T01:10:00.000000+00:00'
