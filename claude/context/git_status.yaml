@@ -1,12 +1,21 @@
 branches:
-- issue-5-rate-limit-display
-- issue-9-autoreload
+- issue-10-log-overlay
+- issue-11-token-stats
+- issue-12-denied-permissions
+- issue-14-alpine-packaging
 - main
 maintenance_actions:
 - fetched
-- 'rebased: issue-5-rate-limit-display'
-- 'rebase_failed: issue-9-autoreload'
-- 'pruned: issue-5-rate-limit-display'
-- template_fetched
-- 'template_merged: clanker-prep, clanker-run, clanker-setup, .claude-base-files'
-recorded_at: '2026-04-12T11:55:00.890680+00:00'
+- main fast-forwarded
+- manually rebased issue-12-denied-permissions (css/js conflicts resolved)
+- new branches created for issues 10, 11, 14
+recorded_at: '2026-04-12T18:00:00+00:00'
+notes:
+- issue-12: denied permissions badge + overlay - complete, rebased onto main
+- issue-14: Alpine packaging workflow (package.yml) + APKBUILD + OpenRC scripts
+- issue-11: fixed cost/token extraction from result log records (total_cost_usd,usage)
+- issue-10: log viewer converted to overlay modal (replaces inline details)
+- issue-8 (timezone): already implemented via tz_offset_secs in WASM
+- issue-5 (tokens/limits): limit detection fixed previously; token extraction fixed via #11
+- issue-6 (machine-readable outputs): design docs written, implementation in claude-base repo
+- issue-4 (layout compact): already implemented (columns, dots, show-more)
