@@ -218,11 +218,16 @@ def parse_jsonl(jsonl_path):
         limit_hit   = bool(rec.get("limit_hit", False))
         limit_reset = rec.get("limit_reset")
 
-        # Cross-check limit_hit against the actual result in the log_excerpt.
-        # clanker may set limit_hit=True if the rate-limit string appears anywhere
-        # in the log, including from a previous run's context.  If the last
-        # {"type":"result"} record shows is_error=false, the run actually succeeded.
-        # Also extract the reset time from the result message or rate_limit_event.
+        # Top-level cost/token fields (written by clanker-run; may be null/zero).
+        cost_usd   = rec.get("cost_usd")    # float or None
+        tokens_in  = rec.get("tokens_in")   # int or None
+        tokens_out = rec.get("tokens_out")  # int or None
+
+        # Parse log_excerpt JSONL lines to:
+        #   - cross-check limit_hit / extract reset time (issue #5)
+        #   - extract cost and token counts from result records (issue #11)
+        #     (clanker-run historically left top-level cost/tokens as null/0;
+        #      the actual totals live in total_cost_usd and usage on the result record)
         log_excerpt = rec.get("log_excerpt", "")
         permission_denials = []  # list of {"tool": str, "input": str}
         for log_line in log_excerpt.splitlines():
@@ -246,6 +251,27 @@ def parse_jsonl(jsonl_path):
                 # Format A: {"type":"result","permission_denials":[...]}
                 for d in (jl.get("permission_denials") or []):
                     permission_denials.append(_parse_denial(d))
+                # Fallback: extract total_cost_usd from the result record (issue #11)
+                if not cost_usd:
+                    raw = jl.get("total_cost_usd")
+                    if isinstance(raw, (int, float)) and raw:
+                        cost_usd = float(raw)
+                # Fallback: extract token counts from usage (issue #11)
+                usage = jl.get("usage")
+                if isinstance(usage, dict):
+                    if tokens_in is None or tokens_in == 0:
+                        # Sum all input variants: regular + cache creation + cache read
+                        t_in = (
+                            (usage.get("input_tokens") or 0)
+                            + (usage.get("cache_creation_input_tokens") or 0)
+                            + (usage.get("cache_read_input_tokens") or 0)
+                        )
+                        if t_in:
+                            tokens_in = t_in
+                    if tokens_out is None or tokens_out == 0:
+                        t_out = usage.get("output_tokens") or 0
+                        if t_out:
+                            tokens_out = t_out
             elif t == "rate_limit_event" and limit_reset is None:
                 # rate_limit_event carries a Unix timestamp in resetsAt; convert
                 # to a simple HH:MM string so the badge is informative.
@@ -270,9 +296,9 @@ def parse_jsonl(jsonl_path):
             "invoked":             bool(rec.get("invoked", False)),
             "limit_hit":           limit_hit,
             "limit_reset":         limit_reset,
-            "cost_usd":            rec.get("cost_usd"),       # float or None
-            "tokens_in":           rec.get("tokens_in"),      # int or None
-            "tokens_out":          rec.get("tokens_out"),     # int or None
+            "cost_usd":            cost_usd,           # float or None
+            "tokens_in":           tokens_in,          # int or None
+            "tokens_out":          tokens_out,         # int or None
             "exit_code":           rec.get("exit_code"),      # int or None
             "log":                 log_excerpt,
             "permission_denials":  permission_denials,        # list of {"tool","input"}

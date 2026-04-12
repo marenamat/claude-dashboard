@@ -361,7 +361,7 @@ fn parse_run(v: &ciborium::value::Value) -> RunView {
     "—".into()
   };
 
-  let cost = if let Some(c) = cost_usd {
+  let cost = if let Some(c) = cost_usd.filter(|&v| v > 0.0) {
     format!("${c:.4}")
   } else if tokens_in.is_some() || tokens_out.is_some() {
     let mut parts = vec![];
