@@ -180,17 +180,55 @@ def parse_jsonl(jsonl_path):
             print(f"  Warning: {jsonl_path}:{lineno}: missing/invalid 'start', skipping", file=sys.stderr)
             continue
 
+        limit_hit   = bool(rec.get("limit_hit", False))
+        limit_reset = rec.get("limit_reset")
+
+        # Cross-check limit_hit against the actual result in the log_excerpt.
+        # clanker may set limit_hit=True if the rate-limit string appears anywhere
+        # in the log, including from a previous run's context.  If the last
+        # {"type":"result"} record shows is_error=false, the run actually succeeded.
+        # Also extract the reset time from the result message or rate_limit_event.
+        log_excerpt = rec.get("log_excerpt", "")
+        for log_line in log_excerpt.splitlines():
+            log_line = log_line.strip()
+            if not log_line:
+                continue
+            try:
+                jl = json.loads(log_line)
+            except (json.JSONDecodeError, ValueError):
+                continue
+            t = jl.get("type")
+            if t == "result":
+                if not jl.get("is_error", True):
+                    # Run completed successfully — clear spurious limit flag
+                    limit_hit = False
+                elif limit_reset is None:
+                    # Extract reset time from result message e.g. "resets 12pm ..."
+                    m = RE_LIMIT_RESET.search(jl.get("result", ""))
+                    if m:
+                        limit_reset = m.group(1)
+            elif t == "rate_limit_event" and limit_reset is None:
+                # rate_limit_event carries a Unix timestamp in resetsAt; convert
+                # to a simple HH:MM string so the badge is informative.
+                resets_at = jl.get("rate_limit_info", {}).get("resetsAt")
+                if resets_at:
+                    try:
+                        dt = datetime.fromtimestamp(int(resets_at), tz=timezone.utc)
+                        limit_reset = dt.strftime("%H:%M UTC")
+                    except (ValueError, OSError, OverflowError):
+                        pass
+
         runs.append({
             "start":       start,
             "end":         _parse_iso(rec.get("end")),
             "invoked":     bool(rec.get("invoked", False)),
-            "limit_hit":   bool(rec.get("limit_hit", False)),
-            "limit_reset": rec.get("limit_reset"),   # str or None, e.g. "11pm"
+            "limit_hit":   limit_hit,
+            "limit_reset": limit_reset,
             "cost_usd":    rec.get("cost_usd"),       # float or None
             "tokens_in":   rec.get("tokens_in"),      # int or None
             "tokens_out":  rec.get("tokens_out"),     # int or None
             "exit_code":   rec.get("exit_code"),      # int or None
-            "log":         rec.get("log_excerpt", ""),
+            "log":         log_excerpt,
         })
 
     # Newest first; caller is responsible for capping

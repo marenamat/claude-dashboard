@@ -1,18 +1,12 @@
 branches:
+- issue-5-rate-limit-display
 - issue-9-autoreload
 - main
 maintenance_actions:
 - fetched
 - main fast-forwarded
-- 'rebased: issue-10-pretty-logs'
-- 'rebased: issue-11-token-stats'
-- 'rebased: issue-7-more-dashboard-events'
-- 'rebased: issue-8-timezone'
+- 'rebased: issue-5-rate-limit-display'
 - 'rebased: issue-9-autoreload'
-- 'pruned: issue-10-pretty-logs'
-- 'pruned: issue-11-token-stats'
-- 'pruned: issue-7-more-dashboard-events'
-- 'pruned: issue-8-timezone'
 - template_fetched
 - 'template_merged: clanker-prep, clanker-run, clanker-setup, .claude-base-files'
-recorded_at: '2026-04-12T08:55:00.744855+00:00'
+recorded_at: '2026-04-12T09:25:00.766757+00:00'

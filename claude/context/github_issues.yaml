@@ -1,9 +1,13 @@
-fetched_at: '2026-04-12T08:55:00.744855+00:00'
+fetched_at: '2026-04-12T09:25:00.766757+00:00'
 issues:
 - author: marenamat
   body: json logs are impossible to human-read verbatim, pretty-print them, as an
     actual structure to be displayed, collapsible
-  comments: []
+  comments:
+  - author: marenamat
+    body: now the logs look very clumsy because of the column width → they could pop
+      up as an overlay instead
+    id: 4231187566
   created_at: '2026-04-07T08:16:18Z'
   labels: []
   number: 10
@@ -47,7 +51,10 @@ issues:
 
     Find out how to get spent tokens from the jobs; would `--output-format=stream-json`
     help?'
-  comments: []
+  comments:
+  - author: marenamat
+    body: limit warning shown even if not hit
+    id: 4231186202
   created_at: '2026-04-06T19:40:41Z'
   labels: []
   number: 5
