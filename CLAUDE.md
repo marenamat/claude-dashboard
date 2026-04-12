@@ -104,6 +104,17 @@ That is where the overall project goal is stored.
 If a design requirement is added or modified by means of github issue, update
 the design documents accordingly.
 
+## Handle open questions
+
+Read `claude/questions.md`. For each open question:
+- If you can answer it yourself, update the relevant design document in
+  `claude/design/` with the resolution, then **remove that question** from
+  `claude/questions.md`.
+- If the question requires guardian input, leave it in place.
+
+`claude/questions.md` must contain **only open, unanswered questions**.
+Resolved items belong in the design docs, not in questions.md.
+
 # Limits
 
 - Never touch `hacks/` but you may read it.
