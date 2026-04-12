@@ -1,4 +1,4 @@
-fetched_at: '2026-04-12T00:55:00.377311+00:00'
+fetched_at: '2026-04-12T08:55:00.744855+00:00'
 issues:
 - author: marenamat
   body: json logs are impossible to human-read verbatim, pretty-print them, as an
@@ -26,17 +26,6 @@ issues:
   labels: []
   number: 8
   title: Timezone
-- author: marenamat
-  body: 'Show up to 1280 log items, add "5 more", then "10 more", then "20 more",
-    exponentially.
-
-
-    Add a collapse button.'
-  comments: []
-  created_at: '2026-04-07T08:11:29Z'
-  labels: []
-  number: 7
-  title: More dashboard events
 - author: marenamat
   body: 'Draft requirements for `claude-base` so that they can implement fixes to
     `clanker-prep` and `clanker-run` scripts to make their output machine-readable.
