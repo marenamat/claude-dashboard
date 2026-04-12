@@ -175,15 +175,22 @@ PYEOF
   python3 - "$start_time" "$end_time" "$invoked" "$exit_code" "$tmp_out" \
     >>"$selfdir/clanker-runs.jsonl" <<'PYEOF' || true
 import sys, json, re
+from datetime import datetime, timezone
 
 start, end, invoked_str, exit_code_str, tmp_path = sys.argv[1:]
 invoked = invoked_str == "true"
 exit_code = int(exit_code_str)
 
+# "You've hit your limit · resets 11pm" or "resets at 11pm" etc.
+RE_LIMIT_RESET = re.compile(
+    r"you.?ve hit your limit.*?reset\w*\s+(?:at\s+)?([^\s.,\n]+)", re.IGNORECASE)
+
 cost_usd = None
 tokens_in = None
 tokens_out = None
 limit_hit = False
+limit_reset = None
+last_result = None
 log_lines = []
 
 try:
@@ -191,37 +198,64 @@ try:
         log_lines = f.readlines()
     for line in log_lines:
         s = line.strip()
-        # Text fallback for rate limit detection
+        # Text fallback for rate limit detection.
+        # May match historical context embedded in user-type messages;
+        # we clear it below if the result record shows success.
         if re.search(r"you.ve hit your limit", s, re.I):
             limit_hit = True
+            m = RE_LIMIT_RESET.search(s)
+            if m and limit_reset is None:
+                limit_reset = m.group(1)
         try:
             obj = json.loads(s)
-            if obj.get("type") == "result":
+            t = obj.get("type")
+            if t == "result":
+                last_result = obj
                 cost_usd = obj.get("cost_usd")
                 usage = obj.get("usage", {})
                 tokens_in = usage.get("input_tokens")
                 tokens_out = usage.get("output_tokens")
                 # Reliable rate-limit detection from structured result
-                err_msg = str(obj.get("error", ""))
+                err_msg = str(obj.get("result") or obj.get("error", ""))
                 if obj.get("subtype") == "error" and re.search(r"limit", err_msg, re.I):
                     limit_hit = True
+                m = RE_LIMIT_RESET.search(err_msg)
+                if m and limit_reset is None:
+                    limit_reset = m.group(1)
+            elif t == "rate_limit_event":
+                # rate_limit_event is the authoritative limit signal
+                limit_hit = True
+                if limit_reset is None:
+                    resets_at = (obj.get("rate_limit_info") or {}).get("resetsAt")
+                    if resets_at:
+                        try:
+                            dt = datetime.fromtimestamp(int(resets_at), tz=timezone.utc)
+                            limit_reset = dt.strftime("%H:%M UTC")
+                        except Exception:
+                            pass
         except Exception:
             pass
 except Exception:
     pass
 
+# If run completed successfully, clear any spurious limit_hit set by the
+# text fallback (which may have matched old context passed as input to Claude).
+if last_result is not None and not last_result.get("is_error", True):
+    limit_hit = False
+
 excerpt = "".join(log_lines[-40:]).rstrip("\n") if log_lines else ""
 
 record = {
-    "start":       start,
-    "end":         end,
-    "invoked":     invoked,
-    "exit_code":   exit_code,
-    "cost_usd":    cost_usd,
-    "tokens_in":   tokens_in,
-    "tokens_out":  tokens_out,
-    "limit_hit":   limit_hit,
-    "log_excerpt": excerpt,
+    "start":        start,
+    "end":          end,
+    "invoked":      invoked,
+    "exit_code":    exit_code,
+    "cost_usd":     cost_usd,
+    "tokens_in":    tokens_in,
+    "tokens_out":   tokens_out,
+    "limit_hit":    limit_hit,
+    "limit_reset":  limit_reset,
+    "log_excerpt":  excerpt,
 }
 print(json.dumps(record))
 PYEOF
