@@ -4,16 +4,9 @@ branches:
 - main
 maintenance_actions:
 - fetched
-- main fast-forwarded
 - 'rebased: issue-5-rate-limit-display'
-- 'rebased: issue-9-autoreload'
+- 'rebase_failed: issue-9-autoreload'
+- 'pruned: issue-5-rate-limit-display'
 - template_fetched
 - 'template_merged: clanker-prep, clanker-run, clanker-setup, .claude-base-files'
-recorded_at: '2026-04-12T09:25:00.766757+00:00'
-session_notes:
-- 'issue-5 bug fix: spurious limit_hit=True corrected in parse_jsonl by cross-checking
-  result.is_error from log_excerpt; also extracts limit_reset from result text and
-  rate_limit_event.resetsAt timestamp'
-- 'issue-5 branch has 3 commits ahead of main: initial feature, context update, bug fix'
-- 'BigInt error (issue #4 comment): caused by stale www/pkg; CI rebuilds automatically,
-  no action needed'
+recorded_at: '2026-04-12T11:55:00.890680+00:00'
