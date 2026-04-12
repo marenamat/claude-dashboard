@@ -98,17 +98,9 @@ try:
         try:
             obj = json.loads(s)
             if obj.get("type") == "result":
-                # total_cost_usd is the correct field in newer Claude Code;
-                # fall back to cost_usd for older versions.
-                cost_usd = obj.get("total_cost_usd") or obj.get("cost_usd")
+                cost_usd = obj.get("cost_usd")
                 usage = obj.get("usage", {})
-                # Sum all input token types (direct + cache creation + cache read)
-                # so the count reflects actual API usage.
-                t_in  = usage.get("input_tokens") or 0
-                t_cc  = usage.get("cache_creation_input_tokens") or 0
-                t_cr  = usage.get("cache_read_input_tokens") or 0
-                total = t_in + t_cc + t_cr
-                tokens_in = total if total > 0 else None
+                tokens_in = usage.get("input_tokens")
                 tokens_out = usage.get("output_tokens")
                 # Reliable rate-limit detection from structured result
                 err_msg = str(obj.get("error", ""))
