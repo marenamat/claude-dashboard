@@ -528,6 +528,27 @@ def main():
     with open(seen_ids_path, "w") as f:
         yaml.dump({"seen_ids": seen_list}, f, default_flow_style=False)
 
+    # --- Dirty workdir check (issue #16) ---
+    # clanker-prep itself writes these files; they're always dirty after a run.
+    PREP_OUTPUTS = {
+        "claude/context/git_status.yaml",
+        "claude/context/github_issues.yaml",
+        "claude/context/pipeline_results.yaml",
+        "claude/context/seen_issue_comment_ids.yaml",
+        "claude/context/seen_pipeline_run_ids.yaml",
+    }
+    dirty_out, _, _ = run("git status --porcelain")
+    dirty_files = []
+    for line in dirty_out.splitlines():
+        if not line.strip():
+            continue
+        # Porcelain format: "XY path" (or "XY old -> new" for renames)
+        fname = line[3:].split(" -> ")[-1].strip()
+        if fname not in PREP_OUTPUTS:
+            dirty_files.append(fname)
+    if dirty_files:
+        reasons.append(f"uncommitted workdir changes: {', '.join(dirty_files)}")
+
     # --- Decision ---
     decision = "INVOKE_CLAUDE" if reasons else "NOTHING_TO_DO"
 
