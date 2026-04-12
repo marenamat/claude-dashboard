@@ -231,6 +231,38 @@ tr.table-warning td:first-child {
   border-bottom: none;
 }
 
+/* Denied-permissions overlay (issue #12) */
+#permissions-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#permissions-overlay.d-none { display: none !important; }
+
+.permissions-card {
+  background: #fff;
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  max-width: 600px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 0.5rem 2rem rgba(0, 0, 0, 0.3);
+}
+
+.denied-settings {
+  background: #212529;
+  color: #adb5bd;
+  font-size: 0.8rem;
+  padding: 0.75rem;
+  border-radius: 0.25rem;
+}
+
 /* Loading/error overlay injected by JS */
 #dash-loading {
   text-align: center;

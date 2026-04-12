@@ -1,13 +1,5 @@
-fetched_at: '2026-04-12T11:55:00.890680+00:00'
+fetched_at: '2026-04-12T16:55:00.103892+00:00'
 issues:
-- author: marenamat
-  body: add the github issue tracker link to the top panel so that reporting bugs
-    is easier
-  comments: []
-  created_at: '2026-04-12T10:00:43Z'
-  labels: []
-  number: 13
-  title: issue tracker link
 - author: marenamat
   body: 'to every task where "permission_denials" is in the output:
 

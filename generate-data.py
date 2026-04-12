@@ -85,6 +85,7 @@ def parse_log(log_path):
             "tokens_in": None,
             "tokens_out": None,
             "log": "",
+            "permission_denials": [],
         }
 
         # First non-empty line is the start date
@@ -141,6 +142,21 @@ def parse_log(log_path):
     return runs
 
 
+def _parse_denial(d):
+    """Normalise one permission-denial entry to {"tool": str, "input": str}."""
+    if isinstance(d, str):
+        return {"tool": d, "input": ""}
+    if not isinstance(d, dict):
+        return {"tool": str(d), "input": ""}
+    # Try common field names for the tool name
+    tool = d.get("name") or d.get("tool_name") or d.get("tool") or "unknown"
+    inp  = d.get("input") or d.get("command") or ""
+    if isinstance(inp, dict):
+        # Summarise dict inputs as "key=value, ..." (first two keys, truncated)
+        inp = ", ".join(f"{k}={str(v)[:40]}" for k, v in list(inp.items())[:2])
+    return {"tool": str(tool), "input": str(inp)[:120]}
+
+
 def _parse_iso(s):
     """Parse an ISO 8601 string (with offset) into a timezone-aware datetime, or None."""
     if not s:
@@ -189,6 +205,7 @@ def parse_jsonl(jsonl_path):
         # {"type":"result"} record shows is_error=false, the run actually succeeded.
         # Also extract the reset time from the result message or rate_limit_event.
         log_excerpt = rec.get("log_excerpt", "")
+        permission_denials = []  # list of {"tool": str, "input": str}
         for log_line in log_excerpt.splitlines():
             log_line = log_line.strip()
             if not log_line:
@@ -207,6 +224,9 @@ def parse_jsonl(jsonl_path):
                     m = RE_LIMIT_RESET.search(jl.get("result", ""))
                     if m:
                         limit_reset = m.group(1)
+                # Format A: {"type":"result","permission_denials":[...]}
+                for d in (jl.get("permission_denials") or []):
+                    permission_denials.append(_parse_denial(d))
             elif t == "rate_limit_event" and limit_reset is None:
                 # rate_limit_event carries a Unix timestamp in resetsAt; convert
                 # to a simple HH:MM string so the badge is informative.
@@ -217,18 +237,26 @@ def parse_jsonl(jsonl_path):
                         limit_reset = dt.strftime("%H:%M UTC")
                     except (ValueError, OSError, OverflowError):
                         pass
+            # Format B: {"type":"system","subtype":"permission_denied","tool_use":{...}}
+            if t == "system" and jl.get("subtype") == "permission_denied":
+                permission_denials.append(_parse_denial(jl.get("tool_use") or jl))
+            # Format C: any record with a top-level "permission_denials" field
+            if "permission_denials" in jl and t != "result":
+                for d in (jl["permission_denials"] or []):
+                    permission_denials.append(_parse_denial(d))
 
         runs.append({
-            "start":       start,
-            "end":         _parse_iso(rec.get("end")),
-            "invoked":     bool(rec.get("invoked", False)),
-            "limit_hit":   limit_hit,
-            "limit_reset": limit_reset,
-            "cost_usd":    rec.get("cost_usd"),       # float or None
-            "tokens_in":   rec.get("tokens_in"),      # int or None
-            "tokens_out":  rec.get("tokens_out"),     # int or None
-            "exit_code":   rec.get("exit_code"),      # int or None
-            "log":         log_excerpt,
+            "start":               start,
+            "end":                 _parse_iso(rec.get("end")),
+            "invoked":             bool(rec.get("invoked", False)),
+            "limit_hit":           limit_hit,
+            "limit_reset":         limit_reset,
+            "cost_usd":            rec.get("cost_usd"),       # float or None
+            "tokens_in":           rec.get("tokens_in"),      # int or None
+            "tokens_out":          rec.get("tokens_out"),     # int or None
+            "exit_code":           rec.get("exit_code"),      # int or None
+            "log":                 log_excerpt,
+            "permission_denials":  permission_denials,        # list of {"tool","input"}
         })
 
     # Newest first; caller is responsible for capping
@@ -465,11 +493,21 @@ def render_run_row(run, now, hidden=False):
         limit_badge = f'<span class="badge bg-danger ms-1" title="{limit_title}">limit{reset_label}</span>'
     else:
         limit_badge = ""
+    denied = run.get("permission_denials") or []
+    if denied:
+        denials_json = html.escape(json.dumps(denied), quote=True)
+        denied_badge = (
+            f'<button type="button" class="badge bg-warning text-dark border-0 ms-1 denied-btn"'
+            f' data-denials="{denials_json}" title="Denied permissions: {len(denied)} occurrence(s)">'
+            f'{len(denied)} denied</button>'
+        )
+    else:
+        denied_badge = ""
     start_str = html.escape(fmt_dt_relative(run["start"], now))
     log_escaped = html.escape(run["log"])
     return f"""
       <tr class="{tr_class}">
-        <td class="text-nowrap">{start_str}{limit_badge}</td>
+        <td class="text-nowrap">{start_str}{limit_badge}{denied_badge}</td>
         <td><span class="{inv_class}" title="{inv_title}"></span></td>
         <td>{html.escape(fmt_duration(run))}</td>
         <td>{html.escape(fmt_cost(run))}</td>

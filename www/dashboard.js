@@ -343,6 +343,70 @@
   }
 
   // ---------------------------------------------------------------------------
+  // Denied-permissions overlay (issue #12).
+  //
+  // Each denied-permissions badge is a <button class="denied-btn"> with:
+  //   data-denials — JSON array of {tool, input} objects
+  //
+  // On click the global #permissions-overlay is populated and shown.
+  // Clicking the backdrop or the Close button hides it.
+  function wirePermissionDenials(root) {
+    root.querySelectorAll(".denied-btn").forEach(function(btn) {
+      btn.addEventListener("click", function(e) {
+        e.stopPropagation();
+        var denials = [];
+        try { denials = JSON.parse(btn.dataset.denials || "[]"); } catch (_) {}
+        showDenialsOverlay(denials);
+      });
+    });
+  }
+
+  function showDenialsOverlay(denials) {
+    var overlay = document.getElementById("permissions-overlay");
+    if (!overlay) return;
+
+    // Deduplicated tool list for the settings snippet
+    var tools = denials.map(function(d) { return d.tool || "unknown"; })
+      .filter(function(t, i, a) { return a.indexOf(t) === i; });
+
+    // Build list HTML
+    var listHtml = denials.map(function(d) {
+      var inputHtml = d.input
+        ? ' <span class="text-muted small">(' + escHtml(d.input) + ')</span>'
+        : "";
+      return "<li><code>" + escHtml(d.tool || "unknown") + "</code>" + inputHtml + "</li>";
+    }).join("");
+    overlay.querySelector(".denied-list").innerHTML = listHtml || "<li>No details available.</li>";
+
+    // settings.json snippet
+    var settings = {permissions: {allow: tools.map(function(t) { return t + "(*)"; })}};
+    overlay.querySelector(".denied-settings").textContent = JSON.stringify(settings, null, 2);
+
+    overlay.classList.remove("d-none");
+    document.getElementById("permissions-close").focus();
+  }
+
+  function hideDenialsOverlay() {
+    var overlay = document.getElementById("permissions-overlay");
+    if (overlay) overlay.classList.add("d-none");
+  }
+
+  // Wire the overlay close controls once the DOM is ready.
+  function wireOverlay() {
+    var overlay = document.getElementById("permissions-overlay");
+    if (!overlay) return;
+    // Click on backdrop (outside card) closes
+    overlay.addEventListener("click", function(e) {
+      if (e.target === overlay) hideDenialsOverlay();
+    });
+    var closeBtn = document.getElementById("permissions-close");
+    if (closeBtn) closeBtn.addEventListener("click", hideDenialsOverlay);
+    // Escape key closes
+    document.addEventListener("keydown", function(e) {
+      if (e.key === "Escape" && !overlay.classList.contains("d-none")) hideDenialsOverlay();
+    });
+  }
+
   // Fetch data.cbor as ArrayBuffer
   // ---------------------------------------------------------------------------
   function fetchData() {
@@ -400,6 +464,7 @@
           content.innerHTML = sections.innerHTML;
           wireShowMore(content);
           wireLogPrettyPrint(content);
+          wirePermissionDenials(content);
         }
 
         // Re-apply running indicators that may have arrived via WebSocket
@@ -418,6 +483,7 @@
           );
           wireShowMore(content);
           wireLogPrettyPrint(content);
+          wirePermissionDenials(content);
           applyRunning();
         }
       });
@@ -426,11 +492,13 @@
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", function() {
       wireLogOverlay();
+      wireOverlay();
       run();
       connectWebSocket();
     });
   } else {
     wireLogOverlay();
+    wireOverlay();
     run();
     connectWebSocket();
   }

@@ -235,13 +235,14 @@ fn compute_duration(start: &str, end: &str) -> String {
 // ---------------------------------------------------------------------------
 
 struct RunView {
-  start_raw:   String,  // raw ISO string for relative formatting
-  invoked:     bool,
-  limit_hit:   bool,
-  limit_reset: String,  // e.g. "11pm", empty if unknown
-  duration:    String,
-  cost:        String,
-  log:         String,
+  start_raw:           String,  // raw ISO string for relative formatting
+  invoked:             bool,
+  limit_hit:           bool,
+  limit_reset:         String,  // e.g. "11pm", empty if unknown
+  duration:            String,
+  cost:                String,
+  log:                 String,
+  permission_denials:  Vec<(String, String)>,  // (tool_name, input_summary)
 }
 
 struct PrepView {
@@ -330,6 +331,13 @@ fn parse_project(v: &ciborium::value::Value) -> ProjectView {
   ProjectView { name, path, runs, prep, token_stats }
 }
 
+fn parse_denial(v: &ciborium::value::Value) -> (String, String) {
+  let m = val_as_map(v);
+  let tool  = val_as_str(&m, "tool");
+  let input = val_as_str(&m, "input");
+  (tool, input)
+}
+
 fn parse_run(v: &ciborium::value::Value) -> RunView {
   let map = val_as_map(v);
   let start_raw = extract_text_or_tag(&map, "start").unwrap_or_default();
@@ -341,6 +349,11 @@ fn parse_run(v: &ciborium::value::Value) -> RunView {
   let tokens_in  = val_as_u64(&map, "tokens_in");
   let tokens_out = val_as_u64(&map, "tokens_out");
   let log = val_as_str(&map, "log");
+
+  let permission_denials = match map.get("permission_denials") {
+    Some(ciborium::value::Value::Array(arr)) => arr.iter().map(parse_denial).collect(),
+    _ => vec![],
+  };
 
   let duration = if !start_raw.is_empty() && !end_raw.is_empty() {
     compute_duration(&start_raw, &end_raw)
@@ -359,7 +372,7 @@ fn parse_run(v: &ciborium::value::Value) -> RunView {
     String::from("—")
   };
 
-  RunView { start_raw, invoked, limit_hit, limit_reset, duration, cost, log }
+  RunView { start_raw, invoked, limit_hit, limit_reset, duration, cost, log, permission_denials }
 }
 
 // ---------------------------------------------------------------------------
@@ -371,6 +384,15 @@ fn esc(s: &str) -> String {
    .replace('<', "&lt;")
    .replace('>', "&gt;")
    .replace('"', "&quot;")
+}
+
+// Escape a string for embedding inside a JSON string value (not the attribute).
+fn esc_json(s: &str) -> String {
+  s.replace('\\', r"\\")
+   .replace('"',  r#"\""#)
+   .replace('\n', r"\n")
+   .replace('\r', r"\r")
+   .replace('\t', r"\t")
 }
 
 fn render_run_row(run: &RunView, now_secs: i64, tz_offset_secs: i64, hidden: bool) -> String {
@@ -407,9 +429,24 @@ fn render_run_row(run: &RunView, now_secs: i64, tz_offset_secs: i64, hidden: boo
       log = esc(&run.log),
     )
   };
+
+  // Denied permissions badge (issue #12)
+  let denied_badge = if !run.permission_denials.is_empty() {
+    let n = run.permission_denials.len();
+    // Build JSON array of {tool, input} for the JS overlay
+    let entries: Vec<String> = run.permission_denials.iter().map(|(tool, inp)| {
+      format!(r#"{{"tool":"{}","input":"{}"}}"#, esc_json(tool), esc_json(inp))
+    }).collect();
+    let json = format!("[{}]", entries.join(","));
+    format!(
+      r#" <button type="button" class="badge bg-warning text-dark border-0 ms-1 denied-btn" data-denials="{data}" title="Denied permissions: {n} occurrence(s)">{n} denied</button>"#,
+      data = esc(&json),
+      n = n,
+    )
+  } else { String::new() };
   format!(
     r#"<tr class="{row_class}">
-      <td class="text-nowrap">{start}{limit}</td>
+      <td class="text-nowrap">{start}{limit}{denied}</td>
       <td><span class="{inv}" title="{inv_title}"></span></td>
       <td>{dur}</td>
       <td>{cost}</td>
@@ -418,6 +455,7 @@ fn render_run_row(run: &RunView, now_secs: i64, tz_offset_secs: i64, hidden: boo
     row_class = row_class,
     start = esc(&start_disp),
     limit = limit_badge,
+    denied = denied_badge,
     inv = inv_class,
     inv_title = if run.invoked { "Invoked" } else { "Not invoked" },
     dur = esc(&run.duration),

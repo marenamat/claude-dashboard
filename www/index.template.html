@@ -49,6 +49,17 @@
   </div>
 </div>
 
+<!-- Denied-permissions overlay (issue #12) -->
+<div id="permissions-overlay" class="d-none" role="dialog" aria-modal="true" aria-labelledby="perm-overlay-title">
+  <div class="permissions-card">
+    <h5 id="perm-overlay-title" class="mb-3">Denied permissions</h5>
+    <ul class="denied-list mb-3"></ul>
+    <h6>To allow, add to <code>.claude/settings.json</code>:</h6>
+    <pre class="denied-settings mb-3"></pre>
+    <button type="button" class="btn btn-sm btn-secondary" id="permissions-close">Close</button>
+  </div>
+</div>
+
 <script src="dashboard.js" defer></script>
 </body>
 </html>
