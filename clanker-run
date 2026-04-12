@@ -49,9 +49,103 @@ restart_flag="$selfdir/.clanker-restart-$$"
   invoked=false
   exit_code=-1
   tmp_out=$(mktemp)
+  current_json="$selfdir/clanker-current.json"
+  watcher_script=$(mktemp --suffix=.py)
+  watcher_pid=""
+
+  # Ensure cleanup on any exit (normal, error, or signal).
+  # Kills background watcher, removes temp files, and deletes the live
+  # session marker so the dashboard never sees a stale "running" record.
+  cleanup() {
+    [ -n "$watcher_pid" ] && { kill "$watcher_pid" 2>/dev/null || true; wait "$watcher_pid" 2>/dev/null || true; }
+    rm -f "$watcher_script" "$tmp_out" "$current_json" 2>/dev/null || true
+  }
+  trap cleanup EXIT
 
   if $force || [ "$decision" = "INVOKE_CLAUDE" ]; then
     invoked=true
+
+    # Write clanker-current.json to signal a live session to the dashboard.
+    # Fields: pid (for stale-detection), project, log_file (dashboard can tail
+    # this for live stream-json lines), and live token/cost counters.
+    python3 - "$selfdir" "$BASHPID" "$start_time" "$tmp_out" "$current_json" <<'PYEOF'
+import sys, json
+selfdir, pid, start, log_file, out_path = sys.argv[1:]
+record = {
+    "pid":        int(pid),
+    "start":      start,
+    "project":    selfdir,
+    "log_file":   log_file,
+    "status":     "running",
+    "tokens_in":  0,
+    "tokens_out": 0,
+    "cost_usd":   None,
+}
+with open(out_path, "w") as f:
+    json.dump(record, f)
+    f.write("\n")
+PYEOF
+
+    # Write background watcher script: tails tmp_out as Claude writes to it and
+    # updates token/cost fields in clanker-current.json in-place every 2 s.
+    cat >"$watcher_script" <<'PYEOF'
+#!/usr/bin/env python3
+import sys, json, time
+
+log_file, current_json = sys.argv[1:]
+pos = 0
+
+while True:
+    try:
+        with open(log_file) as f:
+            f.seek(pos)
+            lines = f.readlines()
+            pos = f.tell()
+        for line in lines:
+            s = line.strip()
+            if not s:
+                continue
+            try:
+                obj = json.loads(s)
+                t = obj.get("type")
+                updates = {}
+                if t == "assistant":
+                    # usage may be nested under message.usage
+                    usage = (obj.get("message") or {}).get("usage") or obj.get("usage") or {}
+                    if usage.get("input_tokens") is not None:
+                        updates["tokens_in"] = usage["input_tokens"]
+                    if usage.get("output_tokens") is not None:
+                        updates["tokens_out"] = usage["output_tokens"]
+                elif t == "result":
+                    usage = obj.get("usage") or {}
+                    if usage.get("input_tokens") is not None:
+                        updates["tokens_in"] = usage["input_tokens"]
+                    if usage.get("output_tokens") is not None:
+                        updates["tokens_out"] = usage["output_tokens"]
+                    if obj.get("cost_usd") is not None:
+                        updates["cost_usd"] = obj["cost_usd"]
+                    updates["status"] = "done"
+                if updates:
+                    try:
+                        with open(current_json) as cf:
+                            rec = json.load(cf)
+                        rec.update(updates)
+                        with open(current_json, "w") as cf:
+                            json.dump(rec, cf)
+                            cf.write("\n")
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+    except FileNotFoundError:
+        pass
+    except Exception:
+        pass
+    time.sleep(2)
+PYEOF
+    python3 "$watcher_script" "$tmp_out" "$current_json" &
+    watcher_pid=$!
+
     # Run with stream-json so we can extract cost/token data
     ~/.local/bin/claude \
       -n "$selfdir" \
@@ -61,6 +155,11 @@ restart_flag="$selfdir/.clanker-restart-$$"
       "proceed as the workflow specifies in CLAUDE.md" \
       </dev/null >"$tmp_out" 2>&1 || exit_code=$?
     exit_code=${exit_code:-0}
+
+    # Stop the background watcher now that Claude has exited
+    kill "$watcher_pid" 2>/dev/null || true
+    wait "$watcher_pid" 2>/dev/null || true
+    watcher_pid=""
 
     # Append raw stream output to log (=== header and date were written above)
     cat "$tmp_out" >>clanker.log
@@ -127,7 +226,7 @@ record = {
 print(json.dumps(record))
 PYEOF
 
-  rm -f "$tmp_out"
+  # cleanup trap handles rm of tmp_out, watcher_script, and current_json
 
 ) 200>clanker.lock
 
