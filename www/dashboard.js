@@ -95,43 +95,99 @@
     });
   }
 
-  // Pretty-print JSONL log snippets (issue #10).
+  // ---------------------------------------------------------------------------
+  // Log overlay (issue #10).
   //
-  // Finds every .log-snippet <pre> inside root, tries to parse its content as
-  // JSONL (one JSON object per line).  If successful, replaces the <pre> with a
-  // <div class="log-pretty"> containing one collapsible <details> per record.
-  //
-  // Falls back silently to the raw <pre> if the content is not valid JSONL.
+  // Each table row has a "show" button with class "log-show-btn" holding the
+  // raw log text in data-log.  On click the global #log-overlay is populated
+  // and shown.  Content is pretty-printed when the log is valid JSONL;
+  // otherwise shown as a raw <pre>.
+  // ---------------------------------------------------------------------------
+
   function wireLogPrettyPrint(root) {
+    // Wire log-show-btn buttons (WASM-rendered HTML path).
+    root.querySelectorAll(".log-show-btn").forEach(function(btn) {
+      btn.addEventListener("click", function(e) {
+        e.stopPropagation();
+        showLogOverlay(btn.dataset.log || "");
+      });
+    });
+
+    // Convert any remaining <details><pre class="log-snippet"> from static HTML
+    // fallback (e.g. when WASM failed) into "show" buttons for the overlay.
     root.querySelectorAll("pre.log-snippet").forEach(function(pre) {
       var raw = pre.textContent.trim();
-      if (!raw) return;
-
-      var lines = raw.split("\n").filter(function(l) { return l.trim(); });
-      var records = [];
-      for (var i = 0; i < lines.length; i++) {
-        try {
-          records.push(JSON.parse(lines[i]));
-        } catch (e) {
-          // Not valid JSONL — leave the pre as-is
-          return;
-        }
-      }
-      if (records.length === 0) return;
-
-      var div = document.createElement("div");
-      div.className = "log-pretty";
-      records.forEach(function(rec) {
-        div.appendChild(buildLogRecord(rec));
-      });
-
-      // Replace the <details> containing the pre (to hide the old "show" summary)
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "btn btn-link btn-sm p-0 log-show-btn";
+      btn.textContent = "show";
+      (function(captured) {
+        btn.addEventListener("click", function(e) {
+          e.stopPropagation();
+          showLogOverlay(captured);
+        });
+      }(raw));
       var details = pre.closest("details");
-      if (details) {
-        details.replaceWith(div);
-      } else {
-        pre.replaceWith(div);
+      (details || pre).replaceWith(btn);
+    });
+  }
+
+  function showLogOverlay(raw) {
+    var overlay = document.getElementById("log-overlay");
+    var body    = document.getElementById("log-overlay-body");
+    if (!overlay || !body) return;
+
+    body.innerHTML = "";
+
+    var trimmed = raw.trim();
+    if (trimmed) {
+      // Try to parse as JSONL
+      var lines = trimmed.split("\n").filter(function(l) { return l.trim(); });
+      var records = [];
+      var isJsonl = true;
+      for (var i = 0; i < lines.length; i++) {
+        try { records.push(JSON.parse(lines[i])); }
+        catch (e) { isJsonl = false; break; }
       }
+
+      if (isJsonl && records.length > 0) {
+        // Pretty-printed JSONL
+        var div = document.createElement("div");
+        div.className = "log-pretty";
+        records.forEach(function(rec) { div.appendChild(buildLogRecord(rec)); });
+        body.appendChild(div);
+      } else {
+        // Raw text fallback
+        var pre = document.createElement("pre");
+        pre.className = "log-snippet m-0";
+        pre.textContent = trimmed;
+        body.appendChild(pre);
+      }
+    } else {
+      body.innerHTML = '<p class="text-muted small m-3">No log available.</p>';
+    }
+
+    overlay.classList.remove("d-none");
+    document.getElementById("log-overlay-close").focus();
+  }
+
+  function hideLogOverlay() {
+    var overlay = document.getElementById("log-overlay");
+    if (overlay) overlay.classList.add("d-none");
+  }
+
+  function wireLogOverlay() {
+    var overlay = document.getElementById("log-overlay");
+    if (!overlay) return;
+    // Click on backdrop closes
+    overlay.addEventListener("click", function(e) {
+      if (e.target === overlay) hideLogOverlay();
+    });
+    var closeBtn = document.getElementById("log-overlay-close");
+    if (closeBtn) closeBtn.addEventListener("click", hideLogOverlay);
+    // Escape key closes
+    document.addEventListener("keydown", function(e) {
+      if (e.key === "Escape" && !overlay.classList.contains("d-none")) hideLogOverlay();
     });
   }
 
@@ -369,10 +425,12 @@
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", function() {
+      wireLogOverlay();
       run();
       connectWebSocket();
     });
   } else {
+    wireLogOverlay();
     run();
     connectWebSocket();
   }

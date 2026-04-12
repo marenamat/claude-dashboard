@@ -177,6 +177,60 @@ tr.table-warning td:first-child {
   50%       { opacity: 0.35; }
 }
 
+/* Log overlay (issue #10): full-screen modal for log viewing */
+#log-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  z-index: 9999;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 2rem 1rem;
+  overflow-y: auto;
+}
+
+#log-overlay.d-none { display: none !important; }
+
+.log-overlay-card {
+  background: #212529;
+  border-radius: 0.5rem;
+  width: 100%;
+  max-width: 960px;
+  box-shadow: 0 0.5rem 2rem rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+
+.log-overlay-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 1rem;
+  background: #343a40;
+  border-bottom: 1px solid #495057;
+  color: #dee2e6;
+}
+
+.log-overlay-body {
+  padding: 0.5rem 0;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+/* Inside the overlay, log-pretty takes the full width */
+.log-overlay-body .log-pretty {
+  border: none;
+  border-radius: 0;
+}
+
+.log-overlay-body .log-record {
+  border-bottom: 1px solid #343a40;
+}
+
+.log-overlay-body .log-record:last-child {
+  border-bottom: none;
+}
+
 /* Loading/error overlay injected by JS */
 #dash-loading {
   text-align: center;

@@ -38,6 +38,17 @@
 
 </main>
 
+<!-- Log overlay (issue #10): shows full log / pretty-printed JSONL in a modal -->
+<div id="log-overlay" class="d-none" role="dialog" aria-modal="true" aria-label="Log viewer">
+  <div class="log-overlay-card">
+    <div class="log-overlay-header">
+      <span class="log-overlay-title fw-semibold">Log</span>
+      <button type="button" class="btn-close btn-close-white" id="log-overlay-close" aria-label="Close"></button>
+    </div>
+    <div class="log-overlay-body" id="log-overlay-body"></div>
+  </div>
+</div>
+
 <script src="dashboard.js" defer></script>
 </body>
 </html>

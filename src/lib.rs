@@ -397,13 +397,23 @@ fn render_run_row(run: &RunView, now_secs: i64, tz_offset_secs: i64, hidden: boo
       )
     }
   } else { String::new() };
+  // Log cell: a "show" button that opens the log overlay (issue #10).
+  // data-log holds the raw log text; JS reads it and populates the overlay.
+  let log_btn = if run.log.is_empty() {
+    r#"<span class="text-muted small">—</span>"#.to_owned()
+  } else {
+    format!(
+      r#"<button type="button" class="btn btn-link btn-sm p-0 log-show-btn" data-log="{log}">show</button>"#,
+      log = esc(&run.log),
+    )
+  };
   format!(
     r#"<tr class="{row_class}">
       <td class="text-nowrap">{start}{limit}</td>
       <td><span class="{inv}" title="{inv_title}"></span></td>
       <td>{dur}</td>
       <td>{cost}</td>
-      <td><details><summary>show</summary><pre class="log-snippet">{log}</pre></details></td>
+      <td>{log_btn}</td>
     </tr>"#,
     row_class = row_class,
     start = esc(&start_disp),
@@ -412,7 +422,7 @@ fn render_run_row(run: &RunView, now_secs: i64, tz_offset_secs: i64, hidden: boo
     inv_title = if run.invoked { "Invoked" } else { "Not invoked" },
     dur = esc(&run.duration),
     cost = esc(&run.cost),
-    log = esc(&run.log),
+    log_btn = log_btn,
   )
 }
 
