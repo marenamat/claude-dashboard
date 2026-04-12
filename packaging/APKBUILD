@@ -1,0 +1,46 @@
+# APKBUILD for claude-dashboard
+# The CI workflow replaces __PKGVER__ with the actual build version.
+# Source tarball is prepared by the workflow from pre-built www/ assets.
+
+pkgname=claude-dashboard
+pkgver=__PKGVER__
+pkgrel=0
+pkgdesc="Claude AI runner dashboard (nginx static web UI + websocket server)"
+url="https://github.com/marenamat/claude-dashboard"
+arch="noarch"
+license="GPL-3.0-only"
+depends="nginx python3 py3-cbor2 py3-yaml py3-websockets"
+source="claude-dashboard-$pkgver.tar.gz"
+
+# No compilation needed — all assets are pre-built by the CI before packaging.
+prepare() { default_prepare; }
+build()   { :; }
+check()   { :; }
+
+package() {
+  cd "$builddir"
+
+  # Static web assets (pre-built WASM + generated data stub)
+  install -d "$pkgdir"/usr/share/claude-dashboard
+  cp -r www "$pkgdir"/usr/share/claude-dashboard/
+
+  # Python scripts
+  install -Dm755 generate-data.py \
+    "$pkgdir"/usr/share/claude-dashboard/generate-data.py
+  install -Dm755 ws-server.py \
+    "$pkgdir"/usr/share/claude-dashboard/ws-server.py
+
+  # Nginx config (paths pre-adjusted for the package layout)
+  install -Dm644 nginx/clanker.conf \
+    "$pkgdir"/usr/share/claude-dashboard/nginx/clanker.conf
+
+  # OpenRC init scripts
+  install -Dm755 claude-dashboard.openrc \
+    "$pkgdir"/etc/init.d/claude-dashboard
+  install -Dm755 claude-dashboard-ws.openrc \
+    "$pkgdir"/etc/init.d/claude-dashboard-ws
+
+  # Periodic cron job — refreshes data.cbor every 15 minutes
+  install -Dm755 claude-dashboard-cron \
+    "$pkgdir"/etc/periodic/15min/claude-dashboard
+}

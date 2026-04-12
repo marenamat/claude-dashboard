@@ -1,0 +1,25 @@
+#!/sbin/openrc-run
+# OpenRC init script for the Claude Dashboard nginx HTTP server.
+
+description="Claude Dashboard nginx HTTP server"
+
+INSTALLDIR="/usr/share/claude-dashboard"
+CONF="$INSTALLDIR/nginx/clanker.conf"
+
+command="/usr/sbin/nginx"
+command_args="-c $CONF"
+pidfile="/run/claude-dashboard.pid"
+
+depend() {
+  need net
+  use logger
+}
+
+start_pre() {
+  mkdir -p /var/log/claude-dashboard
+  # Validate nginx config before starting.
+  "$command" -t -c "$CONF" >/dev/null 2>&1 || {
+    eerror "$RC_SVCNAME: nginx config test failed (run: nginx -t -c $CONF)"
+    return 1
+  }
+}

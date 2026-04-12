@@ -1,0 +1,23 @@
+#!/sbin/openrc-run
+# OpenRC init script for the Claude Dashboard WebSocket server (issue #9).
+
+description="Claude Dashboard WebSocket autoreload server"
+
+INSTALLDIR="/usr/share/claude-dashboard"
+LOGDIR="/var/log/claude-dashboard"
+
+command="/usr/bin/python3"
+command_args="$INSTALLDIR/ws-server.py"
+command_background="yes"
+output_log="$LOGDIR/ws-server.log"
+error_log="$LOGDIR/ws-server.log"
+pidfile="/run/claude-dashboard-ws.pid"
+
+depend() {
+  need net
+  use logger
+}
+
+start_pre() {
+  mkdir -p "$LOGDIR"
+}

@@ -1,0 +1,232 @@
+# package.yml — Build an Alpine Linux APK on every push to main.
+# The APK is uploaded as a workflow artifact (90-day retention) and
+# also attached to the rolling "latest" GitHub Release so it can
+# be downloaded to the clankers machine at any time.
+#
+# Package contents:
+#   /usr/share/claude-dashboard/www/         pre-built static web assets
+#   /usr/share/claude-dashboard/generate-data.py
+#   /usr/share/claude-dashboard/ws-server.py
+#   /usr/share/claude-dashboard/nginx/clanker.conf
+#   /etc/init.d/claude-dashboard             OpenRC init (nginx)
+#   /etc/init.d/claude-dashboard-ws          OpenRC init (ws-server)
+#   /etc/periodic/15min/claude-dashboard     crond data-refresh hook
+
+name: Package
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write   # needed to create/update the GitHub Release
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # -----------------------------------------------------------------------
+      # Build the WASM + static assets (same steps as build.yml)
+      # -----------------------------------------------------------------------
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Generate Cargo.lock
+        run: cargo generate-lockfile
+
+      - name: Cache wasm-bindgen-cli binary
+        id: cache-wasm-bindgen
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/wasm-bindgen
+            ~/.cargo/bin/wasm-bindgen-test-runner
+            ~/.cargo/.crates.toml
+            ~/.cargo/.crates2.json
+          key: ${{ runner.os }}-wasm-bindgen-${{ hashFiles('Cargo.lock') }}
+
+      - name: Install wasm-bindgen-cli
+        if: steps.cache-wasm-bindgen.outputs.cache-hit != 'true'
+        run: |
+          WASM_BINDGEN_VERSION=$(python3 -c "
+          import re, sys
+          content = open('Cargo.lock').read()
+          m = re.search(r'\[\[package\]\]\nname = \"wasm-bindgen\"\nversion = \"([^\"]+)\"', content)
+          if not m:
+              print('ERROR: wasm-bindgen not found in Cargo.lock', file=sys.stderr)
+              sys.exit(1)
+          print(m.group(1))
+          ")
+          echo "Installing wasm-bindgen-cli==$WASM_BINDGEN_VERSION"
+          cargo install wasm-bindgen-cli --version "$WASM_BINDGEN_VERSION"
+
+      - name: Install Python dependencies
+        run: pip install cbor2 pyyaml
+
+      - name: Download Bootstrap
+        run: |
+          BOOTSTRAP_VERSION="5.3.3"
+          BOOTSTRAP_DIR="www/bootstrap"
+          mkdir -p "$BOOTSTRAP_DIR/css" "$BOOTSTRAP_DIR/js"
+          BASE="https://cdn.jsdelivr.net/npm/bootstrap@${BOOTSTRAP_VERSION}/dist"
+          curl -sSfL --retry 3 "$BASE/css/bootstrap.min.css"         -o "$BOOTSTRAP_DIR/css/bootstrap.min.css"
+          curl -sSfL --retry 3 "$BASE/css/bootstrap.min.css.map"     -o "$BOOTSTRAP_DIR/css/bootstrap.min.css.map"
+          curl -sSfL --retry 3 "$BASE/js/bootstrap.bundle.min.js"    -o "$BOOTSTRAP_DIR/js/bootstrap.bundle.min.js"
+          curl -sSfL --retry 3 "$BASE/js/bootstrap.bundle.min.js.map" -o "$BOOTSTRAP_DIR/js/bootstrap.bundle.min.js.map"
+
+      - name: Cargo build WASM
+        run: cargo build --target wasm32-unknown-unknown --release
+
+      - name: wasm-bindgen
+        run: |
+          wasm-bindgen target/wasm32-unknown-unknown/release/claude_dashboard.wasm \
+            --out-dir www/pkg --target web --no-typescript
+
+      - name: Generate dashboard data
+        run: python3 generate-data.py
+
+      # -----------------------------------------------------------------------
+      # Determine package version: 0.<yyyymmdd>.<short-sha>
+      # -----------------------------------------------------------------------
+      - name: Set package version
+        run: |
+          PKGVER="0.$(date +%Y%m%d).$(git rev-parse --short HEAD)"
+          echo "PKGVER=$PKGVER" >> "$GITHUB_ENV"
+          echo "APK_NAME=claude-dashboard-${PKGVER}.apk" >> "$GITHUB_ENV"
+
+      # -----------------------------------------------------------------------
+      # Assemble source tarball for abuild
+      # -----------------------------------------------------------------------
+      - name: Prepare source tarball
+        run: |
+          SRC="/tmp/apk-src/claude-dashboard-$PKGVER"
+          mkdir -p "$SRC/nginx"
+          # Pre-built web assets
+          cp -r www "$SRC/"
+          # Python scripts
+          cp generate-data.py ws-server.py "$SRC/"
+          # Nginx config (package-adjusted paths)
+          cp packaging/clanker.conf "$SRC/nginx/clanker.conf"
+          # OpenRC init scripts and cron
+          cp packaging/claude-dashboard.openrc    "$SRC/"
+          cp packaging/claude-dashboard-ws.openrc "$SRC/"
+          cp packaging/claude-dashboard-cron      "$SRC/"
+          # Tar it up
+          cd /tmp/apk-src
+          tar czf "/tmp/claude-dashboard-$PKGVER.tar.gz" "claude-dashboard-$PKGVER/"
+
+      # -----------------------------------------------------------------------
+      # Build APK inside an Alpine container using abuild
+      # -----------------------------------------------------------------------
+      - name: Build Alpine APK
+        run: |
+          mkdir -p /tmp/apk-build /tmp/apk-out
+          cp /tmp/claude-dashboard-$PKGVER.tar.gz /tmp/apk-build/
+          # Instantiate APKBUILD with the correct version
+          sed "s/__PKGVER__/$PKGVER/" packaging/APKBUILD > /tmp/apk-build/APKBUILD
+
+          docker run --rm \
+            -e PKGVER="$PKGVER" \
+            -v /tmp/apk-build:/work \
+            -v /tmp/apk-out:/out \
+            alpine:3.21 sh -c '
+              set -ex
+              apk add --no-cache abuild
+
+              # Temporary signing key (package is not distributed via apk repos;
+              # the key is discarded after this build).
+              mkdir -p /root/.abuild
+              abuild-keygen -a -n -q
+              echo "PACKAGER_PRIVKEY=\"$(ls /root/.abuild/*.rsa)\"" > /root/.abuild/abuild.conf
+
+              cd /work
+              # Compute SHA-512 checksum and update APKBUILD
+              abuild -F checksum
+
+              # Build: REPODEST puts final .apk under /out
+              REPODEST=/out abuild -Fr
+            '
+
+      - name: Locate built APK
+        run: |
+          APK=$(find /tmp/apk-out -name '*.apk' | head -1)
+          echo "APK_PATH=$APK" >> "$GITHUB_ENV"
+          echo "Built APK: $APK"
+
+      # -----------------------------------------------------------------------
+      # Upload artifact (90-day retention, downloadable from Actions tab)
+      # -----------------------------------------------------------------------
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.APK_NAME }}
+          path: ${{ env.APK_PATH }}
+          retention-days: 90
+
+      # -----------------------------------------------------------------------
+      # Keep the current package available as a rolling "latest" GitHub Release.
+      # Deletes the previous "latest" release+tag and creates a fresh one.
+      # -----------------------------------------------------------------------
+      - name: Publish to GitHub Releases (latest)
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO:     ${{ github.repository }}
+        run: |
+          API="https://api.github.com/repos/$REPO"
+          AUTH="-H Authorization: Bearer $GH_TOKEN"
+
+          # Delete old "pkg-latest" release (ignore errors if absent)
+          OLD_ID=$(curl -sf \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            "$API/releases/tags/pkg-latest" \
+            | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('id',''))" 2>/dev/null || true)
+          [ -n "$OLD_ID" ] && curl -sf -X DELETE \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            "$API/releases/$OLD_ID" || true
+
+          # Delete old "pkg-latest" tag
+          curl -sf -X DELETE \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            "$API/git/refs/tags/pkg-latest" || true
+
+          # Create new release
+          RELEASE=$(curl -sf -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Content-Type: application/json" \
+            "$API/releases" \
+            -d "{
+              \"tag_name\": \"pkg-latest\",
+              \"name\": \"Latest package ($PKGVER)\",
+              \"body\": \"Alpine APK built automatically from main (commit $PKGVER).\n\nInstall on Alpine Linux:\n\`\`\`\napk add /path/to/$APK_NAME\n\`\`\`\",
+              \"prerelease\": true
+            }")
+
+          # Extract upload URL (strip the {?name,label} template part)
+          UPLOAD_URL=$(echo "$RELEASE" \
+            | python3 -c "import sys,json; print(json.load(sys.stdin)['upload_url'].split('{')[0])")
+
+          # Upload APK
+          curl -sf -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Content-Type: application/octet-stream" \
+            --data-binary "@$APK_PATH" \
+            "${UPLOAD_URL}?name=${APK_NAME}&label=Alpine+APK+(${PKGVER})"
