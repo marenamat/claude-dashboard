@@ -235,12 +235,13 @@ fn compute_duration(start: &str, end: &str) -> String {
 // ---------------------------------------------------------------------------
 
 struct RunView {
-  start_raw: String,  // raw ISO string for relative formatting
-  invoked: bool,
-  limit_hit: bool,
-  duration: String,
-  cost: String,
-  log: String,
+  start_raw:   String,  // raw ISO string for relative formatting
+  invoked:     bool,
+  limit_hit:   bool,
+  limit_reset: String,  // e.g. "11pm", empty if unknown
+  duration:    String,
+  cost:        String,
+  log:         String,
 }
 
 struct PrepView {
@@ -333,9 +334,10 @@ fn parse_run(v: &ciborium::value::Value) -> RunView {
   let map = val_as_map(v);
   let start_raw = extract_text_or_tag(&map, "start").unwrap_or_default();
   let end_raw   = extract_text_or_tag(&map, "end").unwrap_or_default();
-  let invoked   = val_as_bool(&map, "invoked");
-  let limit_hit = val_as_bool(&map, "limit_hit");
-  let cost_usd  = val_as_f64(&map, "cost_usd");
+  let invoked     = val_as_bool(&map, "invoked");
+  let limit_hit   = val_as_bool(&map, "limit_hit");
+  let limit_reset = val_as_str(&map, "limit_reset");
+  let cost_usd    = val_as_f64(&map, "cost_usd");
   let tokens_in  = val_as_u64(&map, "tokens_in");
   let tokens_out = val_as_u64(&map, "tokens_out");
   let log = val_as_str(&map, "log");
@@ -357,7 +359,7 @@ fn parse_run(v: &ciborium::value::Value) -> RunView {
     String::from("—")
   };
 
-  RunView { start_raw, invoked, limit_hit, duration, cost, log }
+  RunView { start_raw, invoked, limit_hit, limit_reset, duration, cost, log }
 }
 
 // ---------------------------------------------------------------------------
@@ -386,8 +388,15 @@ fn render_run_row(run: &RunView, now_secs: i64, tz_offset_secs: i64, hidden: boo
 
   let inv_class = if run.invoked { "inv-dot inv-yes" } else { "inv-dot inv-no" };
   let limit_badge = if run.limit_hit {
-    r#" <span class="badge bg-danger ms-1" title="Hit rate limit">limit</span>"#
-  } else { "" };
+    if run.limit_reset.is_empty() {
+      r#" <span class="badge bg-danger ms-1" title="Hit rate limit">limit</span>"#.to_owned()
+    } else {
+      format!(
+        r#" <span class="badge bg-danger ms-1" title="Hit rate limit; resets {reset}">limit · resets {reset}</span>"#,
+        reset = esc(&run.limit_reset),
+      )
+    }
+  } else { String::new() };
   format!(
     r#"<tr class="{row_class}">
       <td class="text-nowrap">{start}{limit}</td>

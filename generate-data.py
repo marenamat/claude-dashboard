@@ -35,9 +35,11 @@ SHOW_MAX = 1280      # hard cap on runs displayed per project (issue #7)
 # ---------------------------------------------------------------------------
 
 # Patterns for token/cost lines emitted by Claude Code CLI
-RE_COST       = re.compile(r"Total cost:\s*\$?([\d.]+)", re.IGNORECASE)
-RE_TOKENS_IN  = re.compile(r"Input tokens?:\s*([\d,]+)", re.IGNORECASE)
-RE_TOKENS_OUT = re.compile(r"Output tokens?:\s*([\d,]+)", re.IGNORECASE)
+RE_COST        = re.compile(r"Total cost:\s*\$?([\d.]+)", re.IGNORECASE)
+RE_TOKENS_IN   = re.compile(r"Input tokens?:\s*([\d,]+)", re.IGNORECASE)
+RE_TOKENS_OUT  = re.compile(r"Output tokens?:\s*([\d,]+)", re.IGNORECASE)
+# "You've hit your limit · resets 11pm" or "resets at 11pm" etc.
+RE_LIMIT_RESET = re.compile(r"you'?ve hit your limit.*?reset\w*\s+(?:at\s+)?([^\s.,\n]+)", re.IGNORECASE)
 
 
 def parse_date_line(line):
@@ -78,6 +80,7 @@ def parse_log(log_path):
             "end": None,
             "invoked": False,
             "limit_hit": False,
+            "limit_reset": None,   # e.g. "11pm" if reset time was detected
             "cost_usd": None,
             "tokens_in": None,
             "tokens_out": None,
@@ -106,6 +109,9 @@ def parse_log(log_path):
                 run["invoked"] = True
             if "you've hit your limit" in line.lower():
                 run["limit_hit"] = True
+                m = RE_LIMIT_RESET.search(line)
+                if m and run["limit_reset"] is None:
+                    run["limit_reset"] = m.group(1)
             m = RE_COST.search(line)
             if m:
                 try:
@@ -175,15 +181,16 @@ def parse_jsonl(jsonl_path):
             continue
 
         runs.append({
-            "start":      start,
-            "end":        _parse_iso(rec.get("end")),
-            "invoked":    bool(rec.get("invoked", False)),
-            "limit_hit":  bool(rec.get("limit_hit", False)),
-            "cost_usd":   rec.get("cost_usd"),       # float or None
-            "tokens_in":  rec.get("tokens_in"),      # int or None
-            "tokens_out": rec.get("tokens_out"),     # int or None
-            "exit_code":  rec.get("exit_code"),      # int or None
-            "log":        rec.get("log_excerpt", ""),
+            "start":       start,
+            "end":         _parse_iso(rec.get("end")),
+            "invoked":     bool(rec.get("invoked", False)),
+            "limit_hit":   bool(rec.get("limit_hit", False)),
+            "limit_reset": rec.get("limit_reset"),   # str or None, e.g. "11pm"
+            "cost_usd":    rec.get("cost_usd"),       # float or None
+            "tokens_in":   rec.get("tokens_in"),      # int or None
+            "tokens_out":  rec.get("tokens_out"),     # int or None
+            "exit_code":   rec.get("exit_code"),      # int or None
+            "log":         rec.get("log_excerpt", ""),
         })
 
     # Newest first; caller is responsible for capping
@@ -413,8 +420,13 @@ def render_run_row(run, now, hidden=False):
     tr_class = " ".join(classes)
     inv_class = "inv-dot inv-yes" if run["invoked"] else "inv-dot inv-no"
     inv_title = "Invoked" if run["invoked"] else "Not invoked"
-    limit_badge = ('<span class="badge bg-danger ms-1" title="Hit rate limit">limit</span>'
-                   if run.get("limit_hit") else "")
+    if run.get("limit_hit"):
+        reset_str = run.get("limit_reset")
+        limit_title = f"Hit rate limit; resets {html.escape(reset_str)}" if reset_str else "Hit rate limit"
+        reset_label = f" · resets {html.escape(reset_str)}" if reset_str else ""
+        limit_badge = f'<span class="badge bg-danger ms-1" title="{limit_title}">limit{reset_label}</span>'
+    else:
+        limit_badge = ""
     start_str = html.escape(fmt_dt_relative(run["start"], now))
     log_escaped = html.escape(run["log"])
     return f"""
