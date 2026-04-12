@@ -3,6 +3,7 @@
 # Prints INVOKE_CLAUDE or NOTHING_TO_DO to stdout.
 # All diagnostic output goes to stderr.
 
+import re
 import subprocess
 import json
 import os
@@ -97,52 +98,58 @@ def do_git_maintenance():
         actions.append("fetch_failed: no usable remote (tried github, origin)")
         return actions
 
-    # Fetch and prune stale remote refs
-    out, err, rc = run(f"git fetch {remote} --prune 2>&1")
-    if rc != 0:
-        print(f"git fetch failed: {out} {err}", file=sys.stderr)
-        actions.append(f"fetch_failed: {err}")
-    else:
-        actions.append("fetched")
+    # Remember which branch we started on so we can restore it at the end.
+    original_branch, _, _ = run("git branch --show-current")
 
-    # Fast-forward local main if remote/main is ahead
-    local, _, _ = run("git rev-parse main")
-    remote_main, _, rc = run(f"git rev-parse {remote}/main")
-    if rc != 0:
-        actions.append(f"fetch_failed: cannot resolve {remote}/main")
-        return actions
+    # Stash any dirty files BEFORE touching main or any branch.
+    # Context files written by an earlier clanker-prep run are always dirty;
+    # stashing them here prevents "cannot rebase: You have unstaged changes"
+    # errors when fast-forwarding/rebasing main (issue #18).
+    stash_out, _, _ = run("git stash")
+    # git stash prints "No local changes to stash" when nothing to stash
+    stashed = "No local changes" not in stash_out
 
-    if local != remote_main:
-        current, _, _ = run("git branch --show-current")
-        run("git checkout main")
-        _, err, rc = run(f"git merge --ff-only {remote}/main")
-        if rc == 0:
-            actions.append("main fast-forwarded")
+    try:
+        # Fetch and prune stale remote refs
+        out, err, rc = run(f"git fetch {remote} --prune 2>&1")
+        if rc != 0:
+            print(f"git fetch failed: {out} {err}", file=sys.stderr)
+            actions.append(f"fetch_failed: {err}")
         else:
-            # ff-only failed (diverging histories) — try rebase instead
-            print(f"ff-only failed, trying rebase of main onto {remote}/main", file=sys.stderr)
-            _, err2, rc2 = run(f"git rebase {remote}/main")
-            if rc2 == 0:
-                actions.append(f"main rebased onto {remote}/main")
-            else:
-                run("git rebase --abort")
-                actions.append(f"main_rebase_failed: {err2}")
-        if current and current != "main":
-            run(f"git checkout {current}")
+            actions.append("fetched")
 
-    # Rebase all local branches (except main) onto local main.
-    # Local main is always >= remote/main after the fast-forward above,
-    # so rebasing onto it avoids replaying already-merged commits.
-    # Stash any dirty files so they don't block checkout/rebase (e.g. context
-    # files written by an earlier clanker-prep run that Claude hasn't committed yet).
-    branches_out, _, _ = run("git branch")
-    branches = [line.strip().lstrip("*").strip() for line in branches_out.splitlines()
-                if line.strip() and line.strip().lstrip("*").strip() not in ("", "main")]
-    if branches:
-        current, _, _ = run("git branch --show-current")
-        stash_out, _, _ = run("git stash")
-        # git stash prints "No local changes to stash" when nothing to stash
-        stashed = "No local changes" not in stash_out
+        # Fast-forward local main if remote/main is ahead
+        local, _, _ = run("git rev-parse main")
+        remote_main, _, rc = run(f"git rev-parse {remote}/main")
+        if rc != 0:
+            actions.append(f"fetch_failed: cannot resolve {remote}/main")
+            return actions
+
+        if local != remote_main:
+            run("git checkout main")
+            _, err, rc = run(f"git merge --ff-only {remote}/main")
+            if rc == 0:
+                actions.append("main fast-forwarded")
+            else:
+                # ff-only failed (diverging histories) — try rebase instead
+                print(f"ff-only failed, trying rebase of main onto {remote}/main", file=sys.stderr)
+                _, err2, rc2 = run(f"git rebase {remote}/main")
+                if rc2 == 0:
+                    actions.append(f"main rebased onto {remote}/main")
+                else:
+                    run("git rebase --abort")
+                    actions.append(f"main_rebase_failed: {err2}")
+            # Return to original branch before continuing with feature branch rebases
+            restore = original_branch if original_branch and original_branch != "main" else None
+            if restore:
+                run(f"git checkout {restore}")
+
+        # Rebase all local branches (except main) onto local main.
+        # Local main is always >= remote/main after the fast-forward above,
+        # so rebasing onto it avoids replaying already-merged commits.
+        branches_out, _, _ = run("git branch")
+        branches = [line.strip().lstrip("*").strip() for line in branches_out.splitlines()
+                    if line.strip() and line.strip().lstrip("*").strip() not in ("", "main")]
         for branch in branches:
             run(f"git checkout {branch}")
 
@@ -173,19 +180,26 @@ def do_git_maintenance():
                 actions.append(f"rebase_failed: {branch}")
             else:
                 actions.append(f"rebased: {branch}")
-        # Return to original branch
-        restore = current if current else "main"
+
+        # Prune local branches fully merged into remote/main
+        merged_out, _, _ = run(f"git branch --merged {remote}/main")
+        for branch in merged_out.splitlines():
+            branch = branch.strip().lstrip("*").strip()
+            if branch and branch != "main":
+                run(f"git branch -d {branch}")
+                actions.append(f"pruned: {branch}")
+
+    finally:
+        # Always return to the original branch and restore stashed changes.
+        restore = original_branch if original_branch else "main"
         run(f"git checkout {restore}")
         if stashed:
-            run("git stash pop")
-
-    # Prune local branches fully merged into remote/main
-    merged_out, _, _ = run(f"git branch --merged {remote}/main")
-    for branch in merged_out.splitlines():
-        branch = branch.strip().lstrip("*").strip()
-        if branch and branch != "main":
-            run(f"git branch -d {branch}")
-            actions.append(f"pruned: {branch}")
+            _, _, pop_rc = run("git stash pop")
+            if pop_rc != 0:
+                # Pop failed (conflict with rebased history); drop it.
+                # clanker-prep will regenerate the context files anyway.
+                run("git stash drop")
+                actions.append("stash_pop_failed: context files will be regenerated by prep")
 
     return actions
 
@@ -555,8 +569,13 @@ def main():
     for line in dirty_out.splitlines():
         if not line.strip():
             continue
-        # Porcelain format: "XY path" (or "XY old -> new" for renames)
-        fname = line[3:].split(" -> ")[-1].strip()
+        # Porcelain v1 format: "XY path" (exactly 2 status chars + space + path).
+        # Use regex to be robust against edge cases where line[3:] could mismatch
+        # (e.g. staged-only files where the Y status char is a space).
+        m = re.match(r'^.{2} (.+)$', line)
+        if not m:
+            continue
+        fname = m.group(1).split(" -> ")[-1].strip()
         if fname not in PREP_OUTPUTS:
             dirty_files.append(fname)
     if dirty_files:
