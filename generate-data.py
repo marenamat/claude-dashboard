@@ -113,6 +113,25 @@ def parse_log(log_path):
                 m = RE_LIMIT_RESET.search(line)
                 if m and run["limit_reset"] is None:
                     run["limit_reset"] = m.group(1)
+            # Cross-check: if the run produced a successful result record
+            # (stream-json format), clear spurious limit_hit set from echoed context.
+            stripped = line.strip()
+            if stripped.startswith("{") and '"type"' in stripped:
+                try:
+                    jl = json.loads(stripped)
+                    t = jl.get("type")
+                    if t == "result" and not jl.get("is_error", True):
+                        run["limit_hit"] = False
+                    elif t == "rate_limit_event" and run["limit_reset"] is None:
+                        resets_at = jl.get("rate_limit_info", {}).get("resetsAt")
+                        if resets_at:
+                            try:
+                                dt = datetime.fromtimestamp(int(resets_at), tz=timezone.utc)
+                                run["limit_reset"] = dt.strftime("%H:%M UTC")
+                            except (ValueError, OSError, OverflowError):
+                                pass
+                except (json.JSONDecodeError, ValueError):
+                    pass
             m = RE_COST.search(line)
             if m:
                 try:

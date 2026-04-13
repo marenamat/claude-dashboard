@@ -13,18 +13,17 @@ maintenance_actions:
 - 'rebased: issue-14-alpine-packaging'
 - template_fetched
 - template_up_to_date
-recorded_at: '2026-04-13T04:35:00+00:00'
+recorded_at: '2026-04-13T05:00:00+00:00'
 branch_status:
   issue-10-log-overlay:
     state: stale
     note: log overlay feature already on main; branch has only 1 context commit ahead; guardian can delete
   issue-11-token-stats:
     state: ready_for_review
-    commits_ahead: 3
+    commits_ahead: 2
     note: >
-      a708db8 fixes token/cost extraction from log_excerpt result records;
-      93ef59d adds multi-currency cost per run row;
-      0e2dc2c context update after rebase.
+      c5da86e fixes token/cost extraction from result log_excerpt records (issue #11 "not summing");
+      0388c01 adds multi-currency cost per run row (issue #11 "display spent money in every task row").
       Addresses all issue #11 requirements.
   issue-12-denied-permissions:
     state: orphaned
@@ -35,7 +34,9 @@ branch_status:
     note: Alpine APK packaging + GitHub Actions package.yml
 implemented_on_main:
   issue_4: compact layout (col-xxl-3/col-xl-4), date formatting, BigInt fix
-  issue_5: limit_hit cross-check against result is_error in parse_jsonl
+  issue_5: >
+    limit_hit cross-check in parse_jsonl (run completed successfully → clear flag);
+    fix now also applied to parse_log (stream-json result records scanned for is_error)
   issue_8: browser timezone display via tz_offset_secs in WASM
   issue_9: WebSocket autoreload in dashboard.js (pending python3-websockets install)
   issue_10: log overlay modal with JSONL pretty-print
