@@ -14,3 +14,23 @@ maintenance_actions:
 - template_fetched
 - template_up_to_date
 recorded_at: '2026-04-13T02:25:00.608082+00:00'
+session_actions:
+- fixed clanker-current.json gitignore
+- resolved rebase conflict issue-11-token-stats (generate-data.py: merged permission_denials + cost extraction)
+- resolved rebase conflicts issue-10-log-overlay (context-only conflicts, used ours)
+- added multi-currency cost display per run row on issue-11-token-stats branch
+branch_status:
+  issue-10-log-overlay: feature in main (log overlay), branch has only context commits
+  issue-11-token-stats: ready for review — cost extraction fix + multi-currency display per row
+  issue-12-denied-permissions: feature in main
+  issue-14-alpine-packaging: ready for review — Alpine APK packaging
+issue_status:
+  4: done (compact layout + BigInt fix in main)
+  5: done (spurious limit_hit fix in main)
+  6: design doc written (machine-readable-outputs.md), waiting on claude-base implementation
+  8: done (JS passes browser tz offset to render_dashboard)
+  9: blocked waiting for python3-websockets package install
+  10: done (log overlay in main)
+  11: in-progress on issue-11-token-stats branch
+  12: done (denied permissions overlay in main)
+  14: ready for review on issue-14-alpine-packaging branch
