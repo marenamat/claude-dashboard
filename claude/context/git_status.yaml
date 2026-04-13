@@ -9,28 +9,13 @@ maintenance_actions:
 - main fast-forwarded
 - 'rebased: issue-10-log-overlay'
 - 'rebased: issue-11-token-stats'
-- 'rebase_failed: issue-12-denied-permissions'
+- 'rebase_fixed: issue-12-denied-permissions (skipped context-only conflicting commit; no feature code lost)'
 - 'rebased: issue-14-alpine-packaging'
 - template_fetched
 - template_up_to_date
-recorded_at: '2026-04-13T02:55:00.639016+00:00'
-session_notes_2026_04_13:
-  pipeline_status: all green on main
-  branch_status:
-    issue-10-log-overlay: 'stale — feature merged to main (1889fb6); only a context update commit ahead; can be deleted by guardian'
-    issue-11-token-stats: 'READY FOR REVIEW — 2 commits ahead of main; fixes token/cost extraction from log_excerpt and adds multi-currency cost per run row; builds clean; addresses all issue #11 requirements'
-    issue-12-denied-permissions: 'ORPHANED — rebase failed; feature (issue #12) already in main (8c4b88d); can be deleted by guardian'
-    issue-14-alpine-packaging: '1 commit ahead of main (Alpine packaging + GitHub Actions); issue #14 not in open issues list — may be closed already'
-  open_issues_status:
-    '#4': 'likely done — BigInt fix (cb6a57a) and compact layout in main; guardian should close'
-    '#5': 'likely done — limit_hit cross-check fix in main; guardian should close'
-    '#6': 'dashboard integration done; waiting on claude-base to implement clanker-runs.jsonl output'
-    '#8': 'done — timezone display (e67d74d) in main; guardian should close'
-    '#9': 'done — WebSocket autoreload (530f651) in main; websockets package install pending (see questions.md)'
-    '#10': 'done — log overlay (1889fb6) in main; guardian should close'
-    '#11': 'IN PROGRESS — issue-11-token-stats branch ready for review/merge'
-  pending_guardian_actions:
-    - 'Install python3-websockets for issue #9 (see questions.md)'
-    - 'Review and merge issue-11-token-stats branch'
-    - 'Close issues #4 #5 #8 #9 #10 once satisfied they are done'
-    - 'Delete stale branches issue-10-log-overlay and issue-12-denied-permissions'
+recorded_at: '2026-04-13T03:25:00.690880+00:00'
+notes:
+- 'issue-11-token-stats: 2 feature commits ready (token extraction fix + multi-currency row cost)'
+- 'issue-12-denied-permissions: reset to main HEAD; no feature work; issue not in open issues list'
+- 'issue-10-log-overlay: log overlay already implemented on main; branch only has context commit'
+- 'issue-14-alpine-packaging: Alpine APK packaging + GitHub Actions workflow ready'
