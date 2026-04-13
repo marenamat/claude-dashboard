@@ -240,7 +240,9 @@ struct RunView {
   limit_hit:           bool,
   limit_reset:         String,  // e.g. "11pm", empty if unknown
   duration:            String,
-  cost:                String,
+  cost_usd:            Option<f64>,   // raw USD cost; formatted at render time (issue #11)
+  tokens_in:           Option<u64>,
+  tokens_out:          Option<u64>,
   log:                 String,
   permission_denials:  Vec<(String, String)>,  // (tool_name, input_summary)
 }
@@ -361,18 +363,7 @@ fn parse_run(v: &ciborium::value::Value) -> RunView {
     "—".into()
   };
 
-  let cost = if let Some(c) = cost_usd.filter(|&v| v > 0.0) {
-    format!("${c:.4}")
-  } else if tokens_in.is_some() || tokens_out.is_some() {
-    let mut parts = vec![];
-    if let Some(i) = tokens_in { parts.push(format!("{i} in")); }
-    if let Some(o) = tokens_out { parts.push(format!("{o} out")); }
-    parts.join(" / ")
-  } else {
-    String::from("—")
-  };
-
-  RunView { start_raw, invoked, limit_hit, limit_reset, duration, cost, log, permission_denials }
+  RunView { start_raw, invoked, limit_hit, limit_reset, duration, cost_usd, tokens_in, tokens_out, log, permission_denials }
 }
 
 // ---------------------------------------------------------------------------
@@ -395,7 +386,7 @@ fn esc_json(s: &str) -> String {
    .replace('\t', r"\t")
 }
 
-fn render_run_row(run: &RunView, now_secs: i64, tz_offset_secs: i64, hidden: bool) -> String {
+fn render_run_row(run: &RunView, now_secs: i64, tz_offset_secs: i64, rates: &ExchangeRates, hidden: bool) -> String {
   let start_disp = if run.start_raw.is_empty() {
     "—".to_owned()
   } else {
@@ -444,12 +435,25 @@ fn render_run_row(run: &RunView, now_secs: i64, tz_offset_secs: i64, hidden: boo
       n = n,
     )
   } else { String::new() };
+
+  // Format cost: USD/EUR/CZK if available, else token counts, else dash (issue #11)
+  let cost_str = if let Some(c) = run.cost_usd.filter(|&v| v > 0.0) {
+    fmt_money(c, rates)
+  } else if run.tokens_in.is_some() || run.tokens_out.is_some() {
+    let mut parts = vec![];
+    if let Some(i) = run.tokens_in  { parts.push(format!("{i} in")); }
+    if let Some(o) = run.tokens_out { parts.push(format!("{o} out")); }
+    parts.join(" / ")
+  } else {
+    "—".into()
+  };
+
   format!(
     r#"<tr class="{row_class}">
       <td class="text-nowrap">{start}{limit}{denied}</td>
       <td><span class="{inv}" title="{inv_title}"></span></td>
       <td>{dur}</td>
-      <td>{cost}</td>
+      <td class="text-nowrap small">{cost}</td>
       <td>{log_btn}</td>
     </tr>"#,
     row_class = row_class,
@@ -459,7 +463,7 @@ fn render_run_row(run: &RunView, now_secs: i64, tz_offset_secs: i64, hidden: boo
     inv = inv_class,
     inv_title = if run.invoked { "Invoked" } else { "Not invoked" },
     dur = esc(&run.duration),
-    cost = esc(&run.cost),
+    cost = esc(&cost_str),
     log_btn = log_btn,
   )
 }
@@ -544,7 +548,7 @@ fn render_project(proj: &ProjectView, now_secs: i64, tz_offset_secs: i64, rates:
     r#"<tr><td colspan="5" class="text-muted">No runs recorded.</td></tr>"#.into()
   } else {
     all_runs.iter().enumerate()
-      .map(|(i, r)| render_run_row(r, now_secs, tz_offset_secs, i >= SHOW_INITIAL))
+      .map(|(i, r)| render_run_row(r, now_secs, tz_offset_secs, rates, i >= SHOW_INITIAL))
       .collect()
   };
 
