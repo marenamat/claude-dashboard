@@ -1,19 +1,5 @@
-fetched_at: '2026-04-12T16:55:00.103892+00:00'
+fetched_at: '2026-04-13T02:25:00.608082+00:00'
 issues:
-- author: marenamat
-  body: 'to every task where "permission_denials" is in the output:
-
-
-    - display a badge "Denied permissions" with a count of occurences
-
-    - click-to-overlay displaying the denied permissions
-
-    - display also what to put into `.claude/settings.json` to allow this'
-  comments: []
-  created_at: '2026-04-12T09:46:32Z'
-  labels: []
-  number: 12
-  title: display denied permission list
 - author: marenamat
   body: For each project, calculate and display spent tokens and money during last
     day, week and lifetime. Display money in USD, EUR and CZK at once (show all three

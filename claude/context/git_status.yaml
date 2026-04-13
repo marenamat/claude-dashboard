@@ -7,22 +7,10 @@ branches:
 maintenance_actions:
 - fetched
 - main fast-forwarded
-- 'rebased: issue-10-log-overlay'
-- 'rebased: issue-11-token-stats'
-- manually rebased issue-12-denied-permissions (resolved conflicts with log-overlay #10)
+- 'rebase_failed: issue-10-log-overlay'
+- 'rebase_failed: issue-11-token-stats'
+- 'rebased: issue-12-denied-permissions'
 - 'rebased: issue-14-alpine-packaging'
 - template_fetched
-- 'template_merged: clanker-prep, clanker-run, clanker-setup, .claude-base-files, CLAUDE.md'
-recorded_at: '2026-04-13T00:00:00+00:00'
-notes:
-- issue-12 rebase conflict resolved: log-overlay (#10) and denied-permissions (#12) CSS/JS/HTML/Rust both kept
-- issue-10-log-overlay branch has stale duplicate commits (authenticate #17, dissolve-questions #14); feature is already in main
-- issue-11: fix for cost/token extraction from result JSONL records; token stats now sum correctly
-- issue-12: denied permissions badge + overlay - complete, rebased onto main
-- issue-14: Alpine packaging workflow + APKBUILD + OpenRC scripts
-- issues 4,5,8,9 appear resolved (no new branches needed)
-- issue-4 BigInt bug: fixed (render_dashboard uses u32/i32 params not i64)
-- issue-5 limit false positive: fixed in JSONL path (cross-check against result record)
-- issue-6: waiting for claude-base team to implement machine-readable outputs
-- issue-9: autoreload via WebSocket already in main
-- issue-8: timezone via tz_offset_secs already in main
+- template_up_to_date
+recorded_at: '2026-04-13T02:25:00.608082+00:00'
