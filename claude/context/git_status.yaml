@@ -3,47 +3,31 @@ branches:
 - issue-11-token-stats
 - issue-12-denied-permissions
 - issue-14-alpine-packaging
+- issue-15-project-spawner
 - main
 maintenance_actions:
 - fetched
 - main fast-forwarded
 - 'rebased: issue-10-log-overlay'
-- 'rebased: issue-11-token-stats (manual fix: skipped stale context commit)'
+- 'rebased: issue-11-token-stats'
 - 'rebased: issue-12-denied-permissions'
 - 'rebased: issue-14-alpine-packaging'
 - template_fetched
 - template_up_to_date
-recorded_at: '2026-04-13T05:00:00+00:00'
+recorded_at: '2026-04-16T21:25:00.514611+00:00'
 branch_status:
   issue-10-log-overlay:
     state: stale
     note: log overlay feature already on main; branch has only 1 context commit ahead; guardian can delete
-  issue-11-token-stats:
-    state: ready_for_review
-    commits_ahead: 2
-    note: >
-      c5da86e fixes token/cost extraction from result log_excerpt records (issue #11 "not summing");
-      0388c01 adds multi-currency cost per run row (issue #11 "display spent money in every task row").
-      Addresses all issue #11 requirements.
   issue-12-denied-permissions:
-    state: orphaned
-    note: at main HEAD; feature already in main; guardian can delete branch
+    state: stale
+    note: denied permissions feature already on main; branch has no commits ahead; guardian can delete
   issue-14-alpine-packaging:
-    state: ready_for_review
-    commits_ahead: 1
-    note: Alpine APK packaging + GitHub Actions package.yml
-implemented_on_main:
-  issue_4: compact layout (col-xxl-3/col-xl-4), date formatting, BigInt fix
-  issue_5: >
-    limit_hit cross-check in parse_jsonl (run completed successfully → clear flag);
-    fix now also applied to parse_log (stream-json result records scanned for is_error)
-  issue_8: browser timezone display via tz_offset_secs in WASM
-  issue_9: WebSocket autoreload in dashboard.js (pending python3-websockets install)
-  issue_10: log overlay modal with JSONL pretty-print
-  issue_12: denied permissions overlay
-pending_guardian_actions:
-  - 'Install python3-websockets for issue #9 (see questions.md)'
-  - 'Review and merge issue-11-token-stats branch (issue #11)'
-  - 'Review and merge issue-14-alpine-packaging branch (issue #14)'
-  - 'Close issues #4 #5 #8 #9 #10 once satisfied'
-  - 'Delete stale branches: issue-10-log-overlay, issue-12-denied-permissions'
+    state: merged
+    note: issue #14 closed; branch has commits ahead but issue no longer open; guardian can delete
+  issue-11-token-stats:
+    state: in_progress
+    note: 2 commits ahead of main; adds per-run multi-currency cost display and better log excerpt extraction
+  issue-15-project-spawner:
+    state: in_progress
+    note: new branch for project spawner feature; spawner.py, generate-data.py, and lib.rs updated

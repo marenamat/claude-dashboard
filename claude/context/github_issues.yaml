@@ -1,5 +1,42 @@
-fetched_at: '2026-04-13T04:25:00.742646+00:00'
+fetched_at: '2026-04-16T21:25:00.514611+00:00'
 issues:
+- author: marenamat
+  body: "Create a tool which would spawn new repositories.\n\nEvery issue in this\
+    \ repository marked with the label ~SPAWN is to become a completely new project.\n\
+    \nThe issue needs to have a line \"Name: foobar\" where foobar is the name of\
+    \ the directory and also repository. The name must not contain any weird unsafe\
+    \ characters. \n\nThe tool creates a directory under ~/claude/ (must be configurable),\
+    \ clones `claude-base` there, adds the directory into the dashboard, and adds\
+    \ a standard crontab job to run claude-run in that directory, every 30 minutes,\
+    \ at a preselected random minute between 7 and 25 (and 37 to 55).\n\nThe issue\
+    \ text should be downloaded and put into claude/design/original-issue.json.\n\n\
+    The issue may have a line \"Upstream: url\" which points to a git repository to\
+    \ merge with claude-base to create the project.\n\nThe tool is expected to run\
+    \ every 5 minutes from a crontab, and is not expected to run claude itself, pure\
+    \ python. All errors should be reported via the dashboard."
+  comments: []
+  created_at: '2026-04-16T21:19:35Z'
+  labels: []
+  number: 15
+  title: Project spawner
+- author: marenamat
+  body: 'to every task where "permission_denials" is in the output:
+
+
+    - display a badge "Denied permissions" with a count of occurences
+
+    - click-to-overlay displaying the denied permissions
+
+    - display also what to put into `.claude/settings.json` to allow this'
+  comments:
+  - author: marenamat
+    body: show not only what line to add to the settings but also what was the offending
+      action
+    id: 4263489021
+  created_at: '2026-04-12T09:46:32Z'
+  labels: []
+  number: 12
+  title: display denied permission list
 - author: marenamat
   body: For each project, calculate and display spent tokens and money during last
     day, week and lifetime. Display money in USD, EUR and CZK at once (show all three

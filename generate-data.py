@@ -21,8 +21,9 @@ from pathlib import Path
 # Config
 # ---------------------------------------------------------------------------
 
-SELFDIR = Path(__file__).parent.resolve()
-CONFIG_PATH = SELFDIR / "config.yaml"
+SELFDIR      = Path(__file__).parent.resolve()
+CONFIG_PATH  = SELFDIR / "config.yaml"
+SPAWNER_LOG  = SELFDIR / "spawner-log.yaml"   # written by spawner.py (issue #15)
 WWW = SELFDIR / "www"
 MAX_LOG_LINES = 40   # log lines kept per run
 MAX_RUNS = 50        # most recent runs kept per project
@@ -382,6 +383,36 @@ def compute_token_stats(runs, now):
     }
 
 
+def load_spawner_log():
+    """Read spawner-log.yaml and return list of event dicts (issue #15).
+
+    Each event has: timestamp, action, issue, project, message.
+    Returns empty list if the file is absent or unreadable.
+    """
+    if not SPAWNER_LOG.exists():
+        return []
+    try:
+        with open(SPAWNER_LOG) as f:
+            data = yaml.safe_load(f) or {}
+        events = data.get("events", [])
+        # Normalise: ensure each entry has all expected keys.
+        result = []
+        for e in events:
+            if not isinstance(e, dict):
+                continue
+            result.append({
+                "timestamp": e.get("timestamp", ""),
+                "action":    e.get("action", ""),
+                "issue":     e.get("issue"),
+                "project":   e.get("project", ""),
+                "message":   e.get("message", ""),
+            })
+        return result
+    except Exception as ex:
+        print(f"  Warning: cannot read spawner-log.yaml: {ex}", file=sys.stderr)
+        return []
+
+
 def collect(config):
     """Collect data from all configured project paths."""
     now = datetime.now(timezone.utc)
@@ -419,10 +450,14 @@ def collect(config):
             "prep":         prep,          # None or {"decision": ..., "reasons": [...]}
             "token_stats":  token_stats,   # day/week/life token+cost totals (issue #11)
         })
+    print("Reading spawner log...")
+    spawner_events = load_spawner_log()
+
     return {
         "generated_at":   now,
         "exchange_rates": exchange_rates,
         "projects":       projects,
+        "spawner_events": spawner_events,  # list of spawn/error events (issue #15)
     }
 
 
@@ -696,6 +731,58 @@ def render_project_html(proj, now, rates=None):
   </div>"""
 
 
+def render_spawner_html(events):
+    """Render a compact spawner events section (issue #15).
+
+    Only shown when spawner-log.yaml has entries (otherwise returns empty string).
+    """
+    if not events:
+        return ""
+    # Show most recent 20 events, newest first.
+    shown = list(reversed(events[-20:]))
+    rows = []
+    for e in shown:
+        ts  = html.escape(e.get("timestamp", "")[:16].replace("T", " "))
+        act = e.get("action", "")
+        iss = e.get("issue")
+        prj = html.escape(e.get("project", "") or "")
+        msg = html.escape(e.get("message", ""))
+        badge_cls = (
+            "bg-success" if act == "spawned" else
+            "bg-danger"  if act == "error"   else
+            "bg-secondary"
+        )
+        issue_link = f' <a href="https://github.com/marenamat/claude-dashboard/issues/{iss}" class="text-muted small">#{iss}</a>' if iss else ""
+        rows.append(
+            f'<tr>'
+            f'<td class="text-nowrap small text-muted">{ts}</td>'
+            f'<td><span class="badge {badge_cls}">{html.escape(act)}</span>{issue_link}</td>'
+            f'<td class="small">{prj}</td>'
+            f'<td class="small">{msg}</td>'
+            f'</tr>'
+        )
+    rows_html = "\n".join(rows)
+    return f"""
+  <div class="col-12">
+    <section id="spawner-log" class="card mb-3">
+      <div class="card-header"><strong>Spawner log</strong></div>
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+          <thead class="table-secondary">
+            <tr>
+              <th class="small py-0">time</th>
+              <th class="small py-0">action</th>
+              <th class="small py-0">project</th>
+              <th class="small py-0">message</th>
+            </tr>
+          </thead>
+          <tbody>{rows_html}</tbody>
+        </table>
+      </div>
+    </section>
+  </div>"""
+
+
 def write_html(data, template_path, out_path):
     """Inject generated project content into the HTML template."""
     template = template_path.read_text()
@@ -714,6 +801,9 @@ def write_html(data, template_path, out_path):
     sections = "".join(render_project_html(p, now, rates) for p in data["projects"])
     if not sections:
         sections = '<div class="col-12"><p class="text-muted">No projects configured. Edit <code>config.yaml</code>.</p></div>'
+
+    # Spawner log section (issue #15)
+    sections += render_spawner_html(data.get("spawner_events", []))
 
     content = (template
         .replace("{{GENERATED_AT}}", generated_at)

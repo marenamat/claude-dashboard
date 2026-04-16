@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 // CBOR deserialisation helpers
 // ---------------------------------------------------------------------------
 
-fn decode_data(bytes: &[u8]) -> Result<(String, ExchangeRates, Vec<ProjectView>), String> {
+fn decode_data(bytes: &[u8]) -> Result<(String, ExchangeRates, Vec<ProjectView>, Vec<SpawnEvent>), String> {
   let value: ciborium::value::Value = ciborium::de::from_reader(bytes)
     .map_err(|e| format!("CBOR parse error: {e}"))?;
 
@@ -44,7 +44,13 @@ fn decode_data(bytes: &[u8]) -> Result<(String, ExchangeRates, Vec<ProjectView>)
     _ => vec![],
   };
 
-  Ok((generated_at, rates, projects))
+  // Spawner events (issue #15): optional list of {timestamp,action,issue,project,message}
+  let spawner_events = match top.get("spawner_events") {
+    Some(ciborium::value::Value::Array(arr)) => arr.iter().map(parse_spawn_event).collect(),
+    _ => vec![],
+  };
+
+  Ok((generated_at, rates, projects, spawner_events))
 }
 
 fn extract_text_or_tag(
@@ -271,6 +277,15 @@ struct ExchangeRates {
   usd_to_czk: f64,
 }
 
+// One event from spawner-log.yaml (issue #15)
+struct SpawnEvent {
+  timestamp: String,
+  action:    String,  // "spawned" | "error" | "skipped"
+  issue:     Option<u64>,
+  project:   String,
+  message:   String,
+}
+
 struct ProjectView {
   name:        String,
   path:        String,
@@ -310,6 +325,17 @@ fn parse_token_stats(v: &ciborium::value::Value) -> TokenStats {
     week: parse_token_bucket(&map, "week"),
     life: parse_token_bucket(&map, "life"),
   }
+}
+
+fn parse_spawn_event(v: &ciborium::value::Value) -> SpawnEvent {
+  // Spawner events are maps with optional fields (issue #15)
+  let map = val_as_map(v);
+  let timestamp = val_as_str(&map, "timestamp");
+  let action    = val_as_str(&map, "action");
+  let project   = val_as_str(&map, "project");
+  let message   = val_as_str(&map, "message");
+  let issue     = val_as_u64(&map, "issue");
+  SpawnEvent { timestamp, action, issue, project, message }
 }
 
 fn parse_project(v: &ciborium::value::Value) -> ProjectView {
@@ -613,6 +639,71 @@ fn render_project(proj: &ProjectView, now_secs: i64, tz_offset_secs: i64, rates:
 }
 
 // ---------------------------------------------------------------------------
+// Spawner events rendering (issue #15)
+// ---------------------------------------------------------------------------
+
+fn render_spawner_events(events: &[SpawnEvent]) -> String {
+  if events.is_empty() { return String::new(); }
+  // Show most recent 20, newest first.
+  let shown: Vec<&SpawnEvent> = events.iter().rev().take(20).collect();
+  let rows: String = shown.iter().map(|e| {
+    // Truncate ISO timestamp to "YYYY-MM-DD HH:MM"
+    let ts = if e.timestamp.len() >= 16 {
+      e.timestamp[..16].replace('T', " ")
+    } else {
+      e.timestamp.clone()
+    };
+    let badge_cls = match e.action.as_str() {
+      "spawned" => "bg-success",
+      "error"   => "bg-danger",
+      _         => "bg-secondary",
+    };
+    let issue_link = match e.issue {
+      Some(n) => format!(
+        r##" <a href="https://github.com/marenamat/claude-dashboard/issues/{n}" class="text-muted small">#{n}</a>"##
+      ),
+      None => String::new(),
+    };
+    format!(
+      r#"<tr>
+        <td class="text-nowrap small text-muted">{ts}</td>
+        <td><span class="badge {badge_cls}">{act}</span>{iss}</td>
+        <td class="small">{prj}</td>
+        <td class="small">{msg}</td>
+      </tr>"#,
+      ts      = esc(&ts),
+      badge_cls = badge_cls,
+      act     = esc(&e.action),
+      iss     = issue_link,
+      prj     = esc(&e.project),
+      msg     = esc(&e.message),
+    )
+  }).collect();
+  format!(
+    r#"<div class="col-12">
+  <section id="spawner-log" class="card mb-3">
+    <div class="card-header"><strong>Spawner log</strong></div>
+    <div class="card-body p-0">
+      <table class="table table-sm mb-0">
+        <thead class="table-secondary">
+          <tr>
+            <th class="small py-0">time</th>
+            <th class="small py-0">action</th>
+            <th class="small py-0">project</th>
+            <th class="small py-0">message</th>
+          </tr>
+        </thead>
+        <tbody>{rows}</tbody>
+      </table>
+    </div>
+  </section>
+</div>"#,
+    rows = rows,
+  )
+}
+
+
+// ---------------------------------------------------------------------------
 // Public WASM API
 // ---------------------------------------------------------------------------
 
@@ -627,8 +718,9 @@ pub fn render_dashboard(cbor_bytes: &[u8], now_secs: u32, tz_offset_secs: i32) -
   let tz_offset_secs = tz_offset_secs as i64;
   match decode_data(cbor_bytes) {
     Err(e) => format!("ERROR: {e}"),
-    Ok((generated_at, rates, projects)) => {
+    Ok((generated_at, rates, projects, spawner_events)) => {
       let sections: String = projects.iter().map(|p| render_project(p, now_secs, tz_offset_secs, &rates)).collect();
+      let spawner_html = render_spawner_events(&spawner_events);
       let nav: String = projects.iter().map(|p|
         format!(r##"<li class="nav-item"><a class="nav-link" href="#proj-{id}">{name}</a></li>"##,
           id = esc(&p.name), name = esc(&p.name))
@@ -636,10 +728,11 @@ pub fn render_dashboard(cbor_bytes: &[u8], now_secs: u32, tz_offset_secs: i32) -
       format!(
         r#"<div id="dash-nav-items">{nav}</div>
 <div id="dash-generated-at">{gen}</div>
-<div id="dash-content">{sections}</div>"#,
+<div id="dash-content">{sections}{spawner}</div>"#,
         nav = nav,
         gen = esc(&generated_at),
         sections = sections,
+        spawner = spawner_html,
       )
     }
   }
