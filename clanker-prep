@@ -552,6 +552,25 @@ def main():
     with open(seen_ids_path, "w") as f:
         yaml.dump({"seen_ids": seen_list}, f, default_flow_style=False)
 
+    # --- Limit retry check (issue #19) ---
+    # If the last recorded run hit the usage limit, Claude couldn't finish its
+    # work.  Retry as soon as possible (i.e. this run) regardless of other signals.
+    runs_jsonl = selfdir / "clanker-runs.jsonl"
+    if runs_jsonl.exists():
+        try:
+            lines = runs_jsonl.read_text().splitlines()
+            # Walk from the end to find the last non-empty JSON line
+            for raw in reversed(lines):
+                raw = raw.strip()
+                if not raw:
+                    continue
+                last_run = json.loads(raw)
+                if last_run.get("limit_hit"):
+                    reasons.append("last run hit usage limit — retrying now")
+                break
+        except Exception as e:
+            print(f"Could not read clanker-runs.jsonl: {e}", file=sys.stderr)
+
     # --- Dirty workdir check (issues #16, #14) ---
     # clanker-prep itself writes these files; they're always dirty after a run.
     # Any other dirty file (including claude/questions.md) means Claude must run.
