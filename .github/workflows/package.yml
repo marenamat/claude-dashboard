@@ -153,7 +153,11 @@ jobs:
             -v /tmp/apk-out:/out \
             alpine:3.21 sh -c '
               set -ex
-              apk add --no-cache abuild
+              # We run as root; tell abuild/abuild-keygen not to use doas/sudo,
+              # otherwise they fall back to the literal string "doas" when neither
+              # doas nor sudo is installed, causing exit 127.
+              export SUDO=
+              apk add --no-cache abuild fakeroot
 
               # Generate a temporary signing key (discarded after build).
               mkdir -p /root/.abuild
