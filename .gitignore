@@ -20,3 +20,6 @@ www/pkg/
 
 # Rust build artefacts
 target/
+
+# Dashboard configuration
+config.yaml
