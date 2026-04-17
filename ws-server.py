@@ -32,7 +32,9 @@ except ImportError:
 # ---------------------------------------------------------------------------
 
 SELFDIR = Path(__file__).parent.resolve()
-CONFIG_PATH = SELFDIR / "config.yaml"
+# Config search order: system-wide path first, then script directory.
+_SYSTEM_CONFIG = Path("/etc/claude-dashboard/config.yaml")
+CONFIG_PATH = _SYSTEM_CONFIG if _SYSTEM_CONFIG.exists() else SELFDIR / "config.yaml"
 WWW = SELFDIR / "www"
 
 WS_HOST = "::"          # all IPv6 interfaces (dual-stack covers IPv4 too)

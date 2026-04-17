@@ -23,7 +23,9 @@ from pathlib import Path
 # ---------------------------------------------------------------------------
 
 SELFDIR      = Path(__file__).parent.resolve()
-CONFIG_PATH  = SELFDIR / "config.yaml"
+# Config search order: system-wide path first, then script directory.
+_SYSTEM_CONFIG = Path("/etc/claude-dashboard/config.yaml")
+CONFIG_PATH  = _SYSTEM_CONFIG if _SYSTEM_CONFIG.exists() else SELFDIR / "config.yaml"
 SPAWNER_LOG  = SELFDIR / "spawner-log.yaml"   # written by spawner.py (issue #15)
 WWW = SELFDIR / "www"
 MAX_LOG_LINES = 40   # log lines kept per run
@@ -1062,9 +1064,11 @@ def write_html(data, template_path, out_path):
 
 def main():
     if not CONFIG_PATH.exists():
-        print(f"No config found at {CONFIG_PATH}. Creating default.", file=sys.stderr)
+        # Default config goes next to the script (system path not writable without root).
+        default_path = SELFDIR / "config.yaml"
+        print(f"No config found. Creating default at {default_path}.", file=sys.stderr)
         default_config = {"projects": [{"path": str(SELFDIR), "name": "claude-dashboard"}]}
-        CONFIG_PATH.write_text(yaml.dump(default_config, default_flow_style=False))
+        default_path.write_text(yaml.dump(default_config, default_flow_style=False))
 
     with open(CONFIG_PATH) as f:
         config = yaml.safe_load(f)

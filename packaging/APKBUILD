@@ -44,4 +44,8 @@ package() {
   # Periodic cron job — refreshes data.cbor every 15 minutes
   install -Dm755 claude-dashboard-cron \
     "$pkgdir"/etc/periodic/15min/claude-dashboard
+
+  # Config directory: scripts look here first for config.yaml.
+  # The admin provides the actual config; we just create the directory.
+  install -d "$pkgdir"/etc/claude-dashboard
 }
