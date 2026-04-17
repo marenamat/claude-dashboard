@@ -297,6 +297,105 @@ tr.table-warning td:first-child {
   word-break: break-all;
 }
 
+/* Structured log record body (issue #10) */
+.log-record-body {
+  background: #1a1e21;
+  border-top: 1px solid #343a40;
+}
+
+/* Individual content block */
+.log-block {
+  border-bottom: 1px solid #2d3338;
+  padding: 0.25rem 0.75rem;
+}
+
+.log-block:last-child {
+  border-bottom: none;
+}
+
+/* Tool use block */
+.log-block-tool-use {
+  background: #1e2327;
+}
+
+.log-block-tool-header {
+  margin-bottom: 0.2rem;
+}
+
+.log-tool-name {
+  font-weight: bold;
+  font-size: 0.75rem;
+  color: #69b2f8;
+  background: #1c3050;
+  padding: 0.1rem 0.4rem;
+  border-radius: 0.2rem;
+}
+
+/* Labeled field (key: value) */
+.log-labeled-block {
+  margin: 0.15rem 0;
+}
+
+.log-field-label {
+  font-size: 0.65rem;
+  color: #6c757d;
+  margin-right: 0.3rem;
+  vertical-align: top;
+}
+
+/* Primary vs secondary fields */
+.log-block-primary .log-block-content pre { color: #adb5bd; }
+.log-block-secondary .log-block-content pre { color: #6c757d; font-size: 0.7rem; }
+
+/* Text/thinking block colors */
+.log-block-text { background: #212529; }
+.log-block-thinking { background: #1f2733; }
+.log-block-thinking .log-block-content pre { color: #8ab4d4; font-style: italic; }
+
+/* Tool result block */
+.log-block-result { background: #1a211a; }
+.log-block-result .log-block-content pre { color: #8aad8a; }
+.log-block-result-error { background: #231a1a; }
+.log-block-result-error .log-block-content pre { color: #cf8a8a; }
+
+/* Collapsible block for content >3 lines */
+.log-collapsible > summary {
+  white-space: pre-wrap;
+  word-break: break-all;
+  cursor: pointer;
+  color: #6ea8fe;
+  list-style: none;
+  font-size: 0.7rem;
+  font-style: normal;
+}
+
+.log-collapsible > summary::after {
+  content: " [expand]";
+  font-size: 0.65rem;
+  color: #6c757d;
+  font-style: normal;
+}
+
+.log-collapsible[open] > summary::after {
+  content: " [collapse]";
+}
+
+.log-collapsible > pre {
+  margin-top: 0.3rem;
+}
+
+/* Generic content wrapper */
+.log-block-content pre {
+  font-size: 0.7rem;
+  color: #adb5bd;
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin: 0;
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+
 /* Loading/error overlay injected by JS */
 #dash-loading {
   text-align: center;

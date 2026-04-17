@@ -192,6 +192,8 @@
   }
 
   // Build a <details class="log-record"> for one JSONL record.
+  // For assistant/user records, render structured content blocks.
+  // For other types, fall back to a JSON dump.
   function buildLogRecord(rec) {
     var det = document.createElement("details");
     det.className = "log-record";
@@ -204,7 +206,7 @@
     badge.textContent = logTypeLabel(rec);
     sum.appendChild(badge);
 
-    // Excerpt
+    // One-line excerpt
     var exc = document.createElement("span");
     exc.className = "log-record-excerpt";
     exc.textContent = logExcerpt(rec);
@@ -212,21 +214,154 @@
 
     det.appendChild(sum);
 
-    // Full JSON in a pre, shown when expanded
-    var pre = document.createElement("pre");
-    pre.textContent = JSON.stringify(rec, null, 2);
-    det.appendChild(pre);
+    // Body: structured content blocks for assistant/user; raw JSON for others
+    var msg = (rec.message && typeof rec.message === "object") ? rec.message : null;
+    var content = (msg && Array.isArray(msg.content)) ? msg.content : null;
+
+    if (content && content.length > 0) {
+      var body = document.createElement("div");
+      body.className = "log-record-body";
+      var recType = rec.type || "";
+      content.forEach(function(blk) {
+        body.appendChild(buildContentBlock(blk, recType));
+      });
+      det.appendChild(body);
+    } else {
+      // Fallback: full JSON
+      var pre = document.createElement("pre");
+      pre.textContent = JSON.stringify(rec, null, 2);
+      det.appendChild(pre);
+    }
 
     return det;
+  }
+
+  // Build a display element for one content block.
+  function buildContentBlock(blk, recType) {
+    var bt = blk.type || "unknown";
+    if (bt === "text")        return buildTextBlock(blk.text || "");
+    if (bt === "thinking")    return buildCollapsibleBlock(blk.thinking || "", "log-block-thinking");
+    if (bt === "tool_use")    return buildToolUseBlock(blk);
+    if (bt === "tool_result") return buildToolResultBlock(blk);
+
+    // Unknown: small JSON fallback
+    var div = document.createElement("div");
+    div.className = "log-block log-block-unknown";
+    var pre = document.createElement("pre");
+    pre.textContent = JSON.stringify(blk, null, 2);
+    div.appendChild(pre);
+    return div;
+  }
+
+  // Plain text block: collapsible if >3 lines.
+  function buildTextBlock(text) {
+    return buildCollapsibleBlock(text, "log-block-text");
+  }
+
+  // Tool use block: header with tool name, then each input field.
+  // Primary fields (command, pattern, …) shown first and more prominently.
+  function buildToolUseBlock(blk) {
+    var div = document.createElement("div");
+    div.className = "log-block log-block-tool-use";
+
+    // Tool name header
+    var hdr = document.createElement("div");
+    hdr.className = "log-block-tool-header";
+    var nameBadge = document.createElement("span");
+    nameBadge.className = "log-tool-name";
+    nameBadge.textContent = blk.name || "tool";
+    hdr.appendChild(nameBadge);
+    div.appendChild(hdr);
+
+    var input = blk.input;
+    if (input && typeof input === "object") {
+      // Show primary keys first, then others
+      var primaryKeys = ["command", "pattern", "file_path", "old_string", "new_string",
+                         "prompt", "query", "skill", "path", "content"];
+      var allKeys = Object.keys(input);
+      var ordered = primaryKeys.filter(function(k) { return allKeys.indexOf(k) >= 0; });
+      allKeys.forEach(function(k) { if (ordered.indexOf(k) < 0) ordered.push(k); });
+      ordered.forEach(function(k) {
+        var val = String(input[k] == null ? "" : input[k]);
+        var isPrimary = primaryKeys.indexOf(k) >= 0;
+        div.appendChild(buildLabeledBlock(k, val, isPrimary ? "log-block-primary" : "log-block-secondary"));
+      });
+    } else if (input != null) {
+      div.appendChild(buildCollapsibleBlock(String(input), "log-block-primary"));
+    }
+
+    return div;
+  }
+
+  // Tool result block: shows the return value; red if error.
+  function buildToolResultBlock(blk) {
+    var isErr = !!blk.is_error;
+    var content = blk.content;
+    var text = "";
+    if (typeof content === "string") text = content;
+    else if (Array.isArray(content))
+      text = content.map(function(c) { return (typeof c === "object" && c.text) ? c.text : JSON.stringify(c); }).join("\n");
+    else if (content != null) text = JSON.stringify(content);
+
+    var div = document.createElement("div");
+    div.className = "log-block " + (isErr ? "log-block-result-error" : "log-block-result");
+    div.appendChild(buildCollapsibleBlock(text || "(empty)", ""));
+    return div;
+  }
+
+  // A labeled key: value display; value is collapsible if >3 lines.
+  function buildLabeledBlock(label, text, extraClass) {
+    var wrap = document.createElement("div");
+    wrap.className = "log-labeled-block" + (extraClass ? " " + extraClass : "");
+
+    var lbl = document.createElement("span");
+    lbl.className = "log-field-label";
+    lbl.textContent = label + ":";
+    wrap.appendChild(lbl);
+
+    wrap.appendChild(buildCollapsibleBlock(text, ""));
+    return wrap;
+  }
+
+  // Collapsible content: if >3 lines use <details>; else plain <pre>.
+  function buildCollapsibleBlock(text, extraClass) {
+    var wrap = document.createElement("div");
+    wrap.className = "log-block-content" + (extraClass ? " " + extraClass : "");
+
+    if (!text) {
+      var em = document.createElement("em");
+      em.className = "text-muted";
+      em.textContent = "(empty)";
+      wrap.appendChild(em);
+      return wrap;
+    }
+
+    var lines = text.split("\n");
+    if (lines.length > 3) {
+      var det = document.createElement("details");
+      det.className = "log-collapsible";
+      var s = document.createElement("summary");
+      s.textContent = lines.slice(0, 3).join("\n") + "\u2026";
+      det.appendChild(s);
+      var pre = document.createElement("pre");
+      pre.textContent = text;
+      det.appendChild(pre);
+      wrap.appendChild(det);
+    } else {
+      var pre = document.createElement("pre");
+      pre.textContent = text;
+      wrap.appendChild(pre);
+    }
+    return wrap;
   }
 
   // Determine CSS badge class for a log record type.
   function logTypeBadgeClass(rec) {
     var t = rec.type || "";
     var s = rec.subtype || "";
-    if (t === "assistant")      return "log-type-assistant";
-    if (t === "user")           return "log-type-user";
-    if (t === "system")         return "log-type-system";
+    if (t === "assistant")        return "log-type-assistant";
+    if (t === "user")             return "log-type-user";
+    if (t === "system")           return "log-type-system";
     if (t === "rate_limit_event") return "log-type-rate-limit";
     if (t === "result") {
       return (s === "error" || rec.is_error) ? "log-type-result-error" : "log-type-result";
@@ -243,24 +378,42 @@
     return t;
   }
 
-  // One-line excerpt summarising the record content.
+  // One-line excerpt for the summary line.
   function logExcerpt(rec) {
     var t = rec.type || "";
     if (t === "system" && rec.subtype === "init") {
       return "model: " + (rec.model || "?") + "  cwd: " + (rec.cwd || "?");
     }
     if (t === "assistant") {
-      // Pull first text block from the message
+      var msg = rec.message;
+      if (msg && Array.isArray(msg.content)) {
+        // Prefer text; fall back to tool name or thinking indicator
+        for (var i = 0; i < msg.content.length; i++) {
+          var blk = msg.content[i];
+          if (blk.type === "text" && blk.text)
+            return blk.text.replace(/\s+/g, " ").slice(0, 120);
+        }
+        for (var i = 0; i < msg.content.length; i++) {
+          var blk = msg.content[i];
+          if (blk.type === "tool_use") return blk.name + "(\u2026)";
+          if (blk.type === "thinking") return "thinking\u2026";
+        }
+      }
+      if (rec.error) return "error: " + String(rec.error).slice(0, 100);
+      return "";
+    }
+    if (t === "user") {
       var msg = rec.message;
       if (msg && Array.isArray(msg.content)) {
         for (var i = 0; i < msg.content.length; i++) {
           var blk = msg.content[i];
-          if (blk.type === "text" && blk.text) {
-            return blk.text.replace(/\s+/g, " ").slice(0, 120);
+          if (blk.type === "tool_result") {
+            var c = blk.content;
+            var s = typeof c === "string" ? c : JSON.stringify(c);
+            return s.replace(/\s+/g, " ").slice(0, 120);
           }
         }
       }
-      if (rec.error) return "error: " + String(rec.error).slice(0, 100);
       return "";
     }
     if (t === "result") {
