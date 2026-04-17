@@ -9,7 +9,9 @@ pkgdesc="Claude AI runner dashboard (nginx static web UI + websocket server)"
 url="https://github.com/marenamat/claude-dashboard"
 arch="noarch"
 license="GPL-3.0-only"
-depends="nginx python3 py3-cbor2 py3-yaml py3-websockets"
+# nginx is NOT a hard dependency: we ship a sites-available snippet for
+# Alpine's nginx http.d/ but the admin installs and manages nginx separately.
+depends="python3 py3-cbor2 py3-yaml py3-websockets"
 source="claude-dashboard-$pkgver.tar.gz"
 
 # No compilation needed — all assets are pre-built by the CI before packaging.
@@ -30,13 +32,12 @@ package() {
   install -Dm755 ws-server.py \
     "$pkgdir"/usr/share/claude-dashboard/ws-server.py
 
-  # Nginx config (paths pre-adjusted for the package layout)
+  # Nginx sites-available snippet (admin copies to /etc/nginx/http.d/).
+  # We don't manage nginx ourselves — the admin installs nginx separately.
   install -Dm644 nginx/clanker.conf \
     "$pkgdir"/usr/share/claude-dashboard/nginx/clanker.conf
 
-  # OpenRC init scripts
-  install -Dm755 claude-dashboard.openrc \
-    "$pkgdir"/etc/init.d/claude-dashboard
+  # OpenRC init for the WebSocket autoreload server only (not nginx)
   install -Dm755 claude-dashboard-ws.openrc \
     "$pkgdir"/etc/init.d/claude-dashboard-ws
 

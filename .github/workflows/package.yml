@@ -7,9 +7,8 @@
 #   /usr/share/claude-dashboard/www/         pre-built static web assets
 #   /usr/share/claude-dashboard/generate-data.py
 #   /usr/share/claude-dashboard/ws-server.py
-#   /usr/share/claude-dashboard/nginx/clanker.conf
-#   /etc/init.d/claude-dashboard             OpenRC init (nginx)
-#   /etc/init.d/claude-dashboard-ws          OpenRC init (ws-server)
+#   /usr/share/claude-dashboard/nginx/clanker.conf  nginx http.d snippet (not managed by package)
+#   /etc/init.d/claude-dashboard-ws          OpenRC init (ws-server only; nginx managed separately)
 #   /etc/periodic/15min/claude-dashboard     crond data-refresh hook
 
 name: Package
@@ -108,7 +107,10 @@ jobs:
       # -----------------------------------------------------------------------
       - name: Set package version
         run: |
-          PKGVER="0.$(date +%Y%m%d).$(git rev-parse --short HEAD)"
+          # APK version must contain only decimal integers separated by dots.
+          # git short SHA contains hex chars (a-f) which abuild rejects, so
+          # use the commit count instead.
+          PKGVER="0.$(date +%Y%m%d).$(git rev-list --count HEAD)"
           echo "PKGVER=$PKGVER" >> "$GITHUB_ENV"
           echo "APK_NAME=claude-dashboard-${PKGVER}.apk" >> "$GITHUB_ENV"
 
@@ -125,8 +127,7 @@ jobs:
           cp generate-data.py ws-server.py "$SRC/"
           # Nginx config (package-adjusted paths)
           cp packaging/clanker.conf "$SRC/nginx/clanker.conf"
-          # OpenRC init scripts and cron
-          cp packaging/claude-dashboard.openrc    "$SRC/"
+          # OpenRC init (ws-server only; nginx is managed separately, not by this package)
           cp packaging/claude-dashboard-ws.openrc "$SRC/"
           cp packaging/claude-dashboard-cron      "$SRC/"
           # Tar it up
