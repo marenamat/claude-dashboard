@@ -1,4 +1,4 @@
-recorded_at: '2026-04-17T13:30:00Z'
+recorded_at: '2026-04-17T14:00:00Z'
 
 ci_status:
   main: Package CI failing (Build Alpine APK) — root cause: git short SHA contains
@@ -45,3 +45,12 @@ session_2026-04-17e:
   - State unchanged: same 4 branches pending review, same issues in main, same blocked.
   - Package CI still failing; root cause confirmed as invalid APK version format (hex SHA chars); fix in issue-14-nginx awaiting guardian merge.
   - Nothing new to implement; context updated.
+
+session_2026-04-17f:
+  - Discovered issue #10 comment 4267743666 ("remove top-level collapsing") was marked
+    seen but NOT implemented — the log record still used <details> at top level.
+  - Implemented: buildLogRecord now uses <div> + <div class="log-record-header"> instead
+    of <details>/<summary>; content blocks shown directly without click.
+  - Excerpt only shown in header for records without structured body (fallback JSON path).
+  - CSS updated: removed summary + ::before arrow rules, added .log-record-header rule.
+  - Committed as bb74b61 on issue-10-log-overlay.
