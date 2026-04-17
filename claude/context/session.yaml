@@ -1,19 +1,24 @@
-recorded_at: '2026-04-17T20:00:00Z'
+recorded_at: '2026-04-17T22:00:00Z'
 
 ci_status:
-  main: Package CI still failing after the abuild-keygen fix.
-        NEW ROOT CAUSE: abuild -r (install build deps) uses the same
-          SUDO="${SUDO-$(command -v doas || command -v sudo || echo doas)}"
-        pattern internally. With only abuild+fakeroot installed and no
-        doas/sudo, every $SUDO apk add call becomes "doas apk add ..."
-        which exits 127.
-        FIX: branch issue-14-sudo-fix adds "export SUDO=" before any abuild
-        invocation and installs fakeroot alongside abuild, so the container
-        runs all apk ops directly as root without a sudo wrapper.
-        Branch is pending guardian review/merge.
+  main: Package CI consistently failing at "Build Alpine APK" since the beginning.
+        PREVIOUS FIX (export SUDO=) was ineffective: abuild 3.14.1 (Alpine 3.21)
+        uses SUDO_APK / abuild-apk, not $SUDO, so that fix addressed a
+        non-existent problem.
+        NEW ROOT CAUSE: abuild -Fr calls builddeps() which runs
+          abuild-apk add --repository /out/ --virtual .makedepends-claude-dashboard
+          build-base python3 py3-cbor2 py3-yaml py3-websockets
+        This fails (likely /out/ is not a valid apk repo at start, and/or
+        installing build-base in the container causes issues).
+        NEW FIX: branch issue-14-nodeps uses 'abuild -F -d' instead of -Fr.
+          -F  allow running as root
+          -d  skip makedepends/depends installation entirely
+        Our APKBUILD has no makedepends and build() is a no-op, so no build
+        tools are needed at build time. Runtime deps (depends=) are installed
+        by apk on the target system.
 
 issues_pending_review:
-  - 14  # Package CI: SUDO= fix + fakeroot (branch: issue-14-sudo-fix)
+  - 14  # Package CI: -d flag fix (branch: issue-14-nodeps)
 
 issues_in_main_not_yet_closed:
   - 16  # show clone commands overlay (merged to main; GitHub issue still open)
@@ -22,14 +27,11 @@ issues_blocked:
   - 9   # autoreload websocket server — needs py3-websockets package, see questions.md
   - 15  # spawner — needs crontab + config.yaml spawner section, see questions.md
 
-session_2026-04-17i:
-  - Package CI still failing after abuild-keygen fix (2b276d0).
-  - Root cause: abuild -r also uses $SUDO internally; with no doas/sudo installed,
-    it resolves to "doas" and fails with exit 127 on every privileged apk call.
-  - Fix: export SUDO= (empty) so abuild calls apk directly as root.
-  - Also added fakeroot to install list in case abuild needs it for package().
-  - Created branch issue-14-sudo-fix with the fix.
-  - Issue #16 confirmed implemented in main (commits 47ead3b, 3244f35);
-    GitHub issue still open awaiting guardian close.
-  - Design files unchanged; no new design requirements found.
+session_2026-04-17ii:
+  - Diagnosed root cause of Package CI failure using abuild 3.14.1 source analysis.
+  - abuild 3.14.1 uses $SUDO_APK (= abuild-apk) not $SUDO; previous SUDO= fix was wrong.
+  - Real failure: builddeps() calls apk_add_makedeps which tries to use /out/ as
+    an apk repository and install build-base + all depends. This fails.
+  - Fix: 'abuild -F -d' skips deps installation. Committed to branch issue-14-nodeps.
+  - No new issues to work on beyond current blocked items.
   - questions.md: issues #9 and #15 remain blocked on guardian action.
