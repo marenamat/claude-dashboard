@@ -32,3 +32,10 @@ session_2026-04-17c:
   - Issue #10 log overlay: tool use display, thinking collapsible, approved-by-config badge — all done.
   - Issue #19 dates: 2..=3 for weekday names, older shows "dow dd mon hh:mm" — done in branch.
   - Nothing new to implement this session; context updated and committed.
+
+session_2026-04-17d:
+  - Workflow check: no new issues, no new comments since session_2026-04-17c.
+  - State unchanged: 4 branches pending review (#10, #12, #14, #19), 4 issues in main not closed (#4, #16, #17, #18), 2 blocked (#9, #15).
+  - Package CI still failing; fix is in issue-14-nginx, awaiting guardian merge.
+  - issue-17-collapse-no-work rebase still failed; feature is in main — branch can be deleted by guardian.
+  - Nothing new to implement; context updated.
