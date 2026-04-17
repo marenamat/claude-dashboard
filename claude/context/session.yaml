@@ -1,35 +1,35 @@
-recorded_at: '2026-04-17T00:00:00Z'
-branch: issue-4-layout-compact
-status: ready_for_review
+recorded_at: '2026-04-17T12:00:00Z'
 
 ci_status:
-  main: Package CI failing (Build Alpine APK step) since issue-14 was merged
-  root_cause: abuild-keygen -q flag is not valid; fixed in this branch
-  fix: replaced -q with -i in abuild-keygen call; use >> for abuild.conf
+  main: Package CI was failing (Build Alpine APK step) — fixed in issue-14-nginx branch
+  root_cause: APK version used git short SHA (hex chars invalid for APK version format)
+  fix: use git rev-list --count HEAD (pure decimal) — in issue-14-nginx branch
+  note: issue-14-nginx branch not yet merged to main
 
 issues_pending_review:
-  - 18  # raise log processing limit (branch: issue-18-log-limit)
-  - 4   # layout compact (branch: issue-4-layout-compact, this branch)
+  - 14  # nginx packaging + CI version fix (branch: issue-14-nginx)
+  - 19  # relative date format (branch: issue-19-dates)
+  - 10  # auto-approval badge in log overlay (branch: issue-10-log-overlay, this branch)
+  - 12  # offending action in denied permissions (branch: issue-12-denied-action)
 
 issues_implemented_in_main_not_yet_closed:
+  - 18  # raise log processing limit (08fc3f1 in main)
   - 17  # collapse no-work entries (911c894 in main)
   - 16  # show clone commands (47ead3b in main)
-  - 14  # alpine packaging (0e6679f in main)
-  - 12  # display denied permissions (in main)
-  - 10  # display pretty logs (ad24d5f in main)
+  - 4   # layout compact (1a43fce in main): col-12 col-md-6 col-xxl-4
 
 issues_blocked:
-  - 9   # autoreload (needs py3-websockets, see questions.md)
+  - 9   # autoreload (needs py3-websockets installed + nginx setup, see questions.md)
 
-session_2026-04-17:
-  - Routine workflow run.
-  - Package CI (Build Alpine APK) failing since issue-14 introduced it.
-    Root cause: abuild-keygen -q is not a valid flag in Alpine 3.21.
-    Fix: use -i instead (installs pub key to /etc/apk/keys/); use >>
-    for abuild.conf append.
-  - Issue #4 (layout): changed col-xl-4 col-xxl-3 → col-xxl-4 in both
-    src/lib.rs and generate-data.py. Now: 2 cols at 1200px, 3 at 1920px.
-  - All other issue #4 requirements already done: colored invoked dot,
-    SHOW_INITIAL=5, relative date formatting.
-  - issue-17-collapse-no-work has only one extra context-update commit
-    beyond main; feature already merged. Branch can be deleted.
+session_2026-04-17b:
+  - Package CI root cause: git short SHA contains hex chars invalid for APK versions.
+    Fixed in issue-14-nginx branch.
+  - Issue #10 additional comment (4266019082):
+    Added "approved by config" green badge on tool_use entries in log overlay.
+    Two-pass: first scan user messages for tool_use_id→approval, then render.
+    This branch: issue-10-log-overlay (commit 7c3cf8d).
+  - Issue #12 additional comment (4263489021):
+    _parse_denial extracts clean command/path; overlay shows action in
+    red-bordered code block. Branch: issue-12-denied-action (commit 21dec0c).
+  - issue-17-collapse-no-work rebase failed — feature already in main (911c894).
+    Branch can be deleted by guardian.
