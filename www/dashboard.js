@@ -239,15 +239,13 @@
       });
       div.appendChild(body);
     } else {
-      // No structured content: show a one-line excerpt in the header + JSON dump
+      // No structured content: show a one-line excerpt in the header + collapsible JSON dump
       var exc = document.createElement("span");
       exc.className = "log-record-excerpt";
       exc.textContent = logExcerpt(rec);
       hdr.appendChild(exc);
 
-      var pre = document.createElement("pre");
-      pre.textContent = JSON.stringify(rec, null, 2);
-      div.appendChild(pre);
+      div.appendChild(buildCollapsibleBlock(JSON.stringify(rec, null, 2), "log-block-raw-json"));
     }
 
     return div;
@@ -262,12 +260,10 @@
     if (bt === "tool_use")    return buildToolUseBlock(blk, approvalMap);
     if (bt === "tool_result") return buildToolResultBlock(blk);
 
-    // Unknown: small JSON fallback
+    // Unknown: collapsible JSON fallback
     var div = document.createElement("div");
     div.className = "log-block log-block-unknown";
-    var pre = document.createElement("pre");
-    pre.textContent = JSON.stringify(blk, null, 2);
-    div.appendChild(pre);
+    div.appendChild(buildCollapsibleBlock(JSON.stringify(blk, null, 2), "log-block-raw-json"));
     return div;
   }
 
