@@ -229,43 +229,46 @@ def create_project(name, upstream_url, base_dir, claude_base_url, issue_number, 
     """
     Clone claude-base into base_dir/name, optionally merge upstream, and return
     the project directory path.  Raises on any fatal error.
+
+    If the directory already exists (project was set up manually), skip cloning
+    and upstream merge — just record the issue and return.
     """
     project_dir = (base_dir / name).resolve()
 
-    # Guard against re-creation (idempotency safety net)
     if project_dir.exists():
-        raise ValueError(f"directory {project_dir} already exists")
+        # Project already exists; skip cloning, treat as pre-existing.
+        print(f"spawner: {project_dir} already exists, skipping clone", file=sys.stderr)
+    else:
+        # Clone claude-base
+        r = subprocess.run(
+            ["git", "clone", "--", claude_base_url, str(project_dir)],
+            capture_output=True, text=True,
+        )
+        if r.returncode != 0:
+            raise RuntimeError(f"git clone failed: {r.stderr.strip()}")
 
-    # Clone claude-base
-    r = subprocess.run(
-        ["git", "clone", "--", claude_base_url, str(project_dir)],
-        capture_output=True, text=True,
-    )
-    if r.returncode != 0:
-        raise RuntimeError(f"git clone failed: {r.stderr.strip()}")
-
-    # If upstream supplied, merge it into the clone
-    if upstream_url:
-        r = subprocess.run(
-            ["git", "remote", "add", "upstream", upstream_url],
-            capture_output=True, text=True, cwd=project_dir,
-        )
-        if r.returncode != 0:
-            raise RuntimeError(f"git remote add upstream failed: {r.stderr.strip()}")
-        r = subprocess.run(
-            ["git", "fetch", "upstream"],
-            capture_output=True, text=True, cwd=project_dir,
-        )
-        if r.returncode != 0:
-            raise RuntimeError(f"git fetch upstream failed: {r.stderr.strip()}")
-        # Merge upstream/main (allow unrelated histories for fresh clones)
-        r = subprocess.run(
-            ["git", "merge", "--allow-unrelated-histories", "-m",
-             "chore: merge upstream into claude-base clone", "upstream/main"],
-            capture_output=True, text=True, cwd=project_dir,
-        )
-        if r.returncode != 0:
-            raise RuntimeError(f"git merge upstream failed: {r.stderr.strip()}")
+        # If upstream supplied, merge it into the clone
+        if upstream_url:
+            r = subprocess.run(
+                ["git", "remote", "add", "upstream", upstream_url],
+                capture_output=True, text=True, cwd=project_dir,
+            )
+            if r.returncode != 0:
+                raise RuntimeError(f"git remote add upstream failed: {r.stderr.strip()}")
+            r = subprocess.run(
+                ["git", "fetch", "upstream"],
+                capture_output=True, text=True, cwd=project_dir,
+            )
+            if r.returncode != 0:
+                raise RuntimeError(f"git fetch upstream failed: {r.stderr.strip()}")
+            # Merge upstream/main (allow unrelated histories for fresh clones)
+            r = subprocess.run(
+                ["git", "merge", "--allow-unrelated-histories", "-m",
+                 "chore: merge upstream into claude-base clone", "upstream/main"],
+                capture_output=True, text=True, cwd=project_dir,
+            )
+            if r.returncode != 0:
+                raise RuntimeError(f"git merge upstream failed: {r.stderr.strip()}")
 
     # Write original issue to claude/design/original-issue.json
     design_dir = project_dir / "claude" / "design"
