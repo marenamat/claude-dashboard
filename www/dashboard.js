@@ -550,12 +550,18 @@
     var tools = denials.map(function(d) { return d.tool || "unknown"; })
       .filter(function(t, i, a) { return a.indexOf(t) === i; });
 
-    // Build list HTML
+    // Build list HTML: show tool name and the offending action (command/path/etc.)
+    // prominently so the user can see exactly what was blocked (issue #12 comment).
     var listHtml = denials.map(function(d) {
-      var inputHtml = d.input
-        ? ' <span class="text-muted small">(' + escHtml(d.input) + ')</span>'
+      var actionHtml = d.input
+        ? '<div class="denied-action"><code>' + escHtml(d.input) + '</code></div>'
         : "";
-      return "<li><code>" + escHtml(d.tool || "unknown") + "</code>" + inputHtml + "</li>";
+      return (
+        '<li class="mb-2">'
+        + '<code class="denied-tool-name">' + escHtml(d.tool || "unknown") + '</code>'
+        + actionHtml
+        + '</li>'
+      );
     }).join("");
     overlay.querySelector(".denied-list").innerHTML = listHtml || "<li>No details available.</li>";
 

@@ -291,7 +291,12 @@ def parse_log(log_path):
 
 
 def _parse_denial(d):
-    """Normalise one permission-denial entry to {"tool": str, "input": str}."""
+    """Normalise one permission-denial entry to {"tool": str, "input": str}.
+
+    "input" is the human-readable offending action — the specific command,
+    file path, or query that was blocked.  We extract the most meaningful
+    field from the tool input dict rather than a generic key=value dump.
+    """
     if isinstance(d, str):
         return {"tool": d, "input": ""}
     if not isinstance(d, dict):
@@ -300,9 +305,25 @@ def _parse_denial(d):
     tool = d.get("name") or d.get("tool_name") or d.get("tool") or "unknown"
     inp  = d.get("input") or d.get("command") or ""
     if isinstance(inp, dict):
-        # Summarise dict inputs as "key=value, ..." (first two keys, truncated)
-        inp = ", ".join(f"{k}={str(v)[:40]}" for k, v in list(inp.items())[:2])
-    return {"tool": str(tool), "input": str(inp)[:120]}
+        # Extract the most meaningful value for each known tool type
+        if "command" in inp:
+            action = str(inp["command"])       # Bash: the shell command
+        elif "file_path" in inp:
+            action = str(inp["file_path"])     # Read/Write/Edit/Glob/Grep
+        elif "pattern" in inp:
+            path = inp.get("path") or inp.get("file_path") or ""
+            action = str(inp["pattern"])
+            if path:
+                action = f"{action}  (in {path})"
+        elif "query" in inp:
+            action = str(inp["query"])         # WebSearch/WebFetch
+        elif "url" in inp:
+            action = str(inp["url"])
+        else:
+            # Fallback: first key=value (first two keys, truncated)
+            action = ", ".join(f"{k}={str(v)[:40]}" for k, v in list(inp.items())[:2])
+        inp = action
+    return {"tool": str(tool), "input": str(inp)[:300]}
 
 
 def _parse_iso(s):

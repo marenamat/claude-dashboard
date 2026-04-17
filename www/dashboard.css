@@ -263,6 +263,21 @@ tr.table-warning td:first-child {
   border-radius: 0.25rem;
 }
 
+/* Offending action display inside the denied-permissions list (issue #12) */
+.denied-tool-name {
+  font-weight: bold;
+}
+
+.denied-action {
+  margin-top: 0.2rem;
+  padding: 0.2rem 0.5rem;
+  background: #f8f9fa;
+  border-left: 3px solid #dc3545;
+  border-radius: 0.2rem;
+  font-size: 0.85rem;
+  word-break: break-all;
+}
+
 /* Clone commands overlay (issue #16) */
 #clone-overlay {
   position: fixed;
