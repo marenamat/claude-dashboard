@@ -407,6 +407,50 @@
     });
   }
 
+  // ---------------------------------------------------------------------------
+  // Clone commands overlay (issue #16).
+  //
+  // Each project heading has a "clone" button with class "clone-btn" holding
+  // the bash setup snippet in data-clone-cmds.  On click the global
+  // #clone-overlay is populated and shown.
+  // ---------------------------------------------------------------------------
+
+  function wireCloneButtons(root) {
+    root.querySelectorAll(".clone-btn").forEach(function(btn) {
+      btn.addEventListener("click", function(e) {
+        e.stopPropagation();
+        showCloneOverlay(btn.dataset.cloneCmds || "");
+      });
+    });
+  }
+
+  function showCloneOverlay(cmds) {
+    var overlay = document.getElementById("clone-overlay");
+    if (!overlay) return;
+    var pre = overlay.querySelector(".clone-cmds");
+    if (pre) pre.textContent = cmds;
+    overlay.classList.remove("d-none");
+    document.getElementById("clone-overlay-close").focus();
+  }
+
+  function hideCloneOverlay() {
+    var overlay = document.getElementById("clone-overlay");
+    if (overlay) overlay.classList.add("d-none");
+  }
+
+  function wireCloneOverlay() {
+    var overlay = document.getElementById("clone-overlay");
+    if (!overlay) return;
+    overlay.addEventListener("click", function(e) {
+      if (e.target === overlay) hideCloneOverlay();
+    });
+    var closeBtn = document.getElementById("clone-overlay-close");
+    if (closeBtn) closeBtn.addEventListener("click", hideCloneOverlay);
+    document.addEventListener("keydown", function(e) {
+      if (e.key === "Escape" && !overlay.classList.contains("d-none")) hideCloneOverlay();
+    });
+  }
+
   // Fetch data.cbor as ArrayBuffer
   // ---------------------------------------------------------------------------
   function fetchData() {
@@ -465,6 +509,7 @@
           wireShowMore(content);
           wireLogPrettyPrint(content);
           wirePermissionDenials(content);
+          wireCloneButtons(content);
         }
 
         // Re-apply running indicators that may have arrived via WebSocket
@@ -484,6 +529,7 @@
           wireShowMore(content);
           wireLogPrettyPrint(content);
           wirePermissionDenials(content);
+          wireCloneButtons(content);
           applyRunning();
         }
       });
@@ -493,12 +539,14 @@
     document.addEventListener("DOMContentLoaded", function() {
       wireLogOverlay();
       wireOverlay();
+      wireCloneOverlay();
       run();
       connectWebSocket();
     });
   } else {
     wireLogOverlay();
     wireOverlay();
+    wireCloneOverlay();
     run();
     connectWebSocket();
   }

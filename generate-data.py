@@ -8,6 +8,7 @@
 import json
 import os
 import re
+import subprocess
 import sys
 import html
 import cbor2
@@ -29,6 +30,133 @@ MAX_LOG_LINES = 40   # log lines kept per run
 MAX_RUNS = 50        # most recent runs kept per project
 SHOW_INITIAL = 5     # runs shown by default; rest behind "show more"
 SHOW_MAX = 1280      # hard cap on runs displayed per project (issue #7)
+
+
+# ---------------------------------------------------------------------------
+# Git remote reading and clone command generation (issue #16)
+# ---------------------------------------------------------------------------
+
+def read_git_remotes(path):
+    """Read git remotes from a project directory.
+
+    Returns a list of {"name": str, "fetch": str, "push": str} dicts.
+    Fetch and push URLs are the same when not explicitly set otherwise.
+    Returns empty list if path is not a git repo or git is unavailable.
+    """
+    try:
+        out = subprocess.check_output(
+            ["git", "-C", str(path), "remote", "-v"],
+            stderr=subprocess.DEVNULL, text=True,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return []
+
+    # "git remote -v" emits two lines per remote: one (fetch), one (push).
+    remotes = {}
+    for line in out.splitlines():
+        parts = line.split()
+        if len(parts) < 3:
+            continue
+        name, url, kind = parts[0], parts[1], parts[2].strip("()")
+        if name not in remotes:
+            remotes[name] = {"name": name, "fetch": url, "push": url}
+        if kind == "push":
+            remotes[name]["push"] = url
+        elif kind == "fetch":
+            remotes[name]["fetch"] = url
+    return list(remotes.values())
+
+
+def _github_ssh_url(https_url):
+    """Convert https://github.com/org/repo to git@github.com:org/repo."""
+    m = re.match(r"https://github\.com/(.+)", https_url)
+    if m:
+        return f"git@github.com:{m.group(1)}"
+    return https_url
+
+
+def make_clone_commands(path, remotes):
+    """Generate bash setup commands for a human machine (issue #16).
+
+    Determines:
+      - GitHub remote (from 'github' or 'origin' remote, fetch URL)
+      - claude-base remote (if present)
+      - upstream remote (non-origin, non-github, non-claude-base, outside github.com/marenamat)
+      - clanker remote (SSH path based on project path relative to ~/)
+
+    Returns a string with the bash commands to type on a human machine.
+    """
+    home = Path.home()
+    try:
+        rel = path.resolve().relative_to(home)
+        clanker_url = f"claude:{rel}"
+    except ValueError:
+        clanker_url = f"claude:{path}"
+
+    # Find GitHub remote
+    remote_by_name = {r["name"]: r for r in remotes}
+    github_remote = remote_by_name.get("github") or remote_by_name.get("origin")
+    github_fetch  = github_remote["fetch"] if github_remote else None
+    github_push   = _github_ssh_url(github_fetch) if github_fetch else None
+
+    # Derive clone dir from URL or path
+    if github_fetch:
+        clone_dir = github_fetch.rstrip("/").rsplit("/", 1)[-1]
+        if clone_dir.endswith(".git"):
+            clone_dir = clone_dir[:-4]
+    else:
+        clone_dir = path.name
+
+    # claude-base remote
+    claude_base_remote = remote_by_name.get("claude-base")
+
+    # upstream: remotes that are not origin/github/claude-base and outside marenamat
+    upstream_remotes = [
+        r for r in remotes
+        if r["name"] not in ("origin", "github", "claude-base")
+        and "github.com/marenamat" not in r["fetch"]
+    ]
+
+    lines = []
+
+    # Clone step
+    if github_fetch:
+        lines.append(f"# Clone the repository")
+        lines.append(f"git clone {github_fetch}")
+        lines.append(f"cd {clone_dir}")
+        lines.append("")
+        # Set up github remote
+        lines.append("# Rename origin to 'github' and set SSH push URL")
+        lines.append("git remote rename origin github")
+        if github_push and github_push != github_fetch:
+            lines.append(f"git remote set-url --push github {github_push}")
+    else:
+        lines.append(f"# No GitHub remote found; clone manually and cd into {clone_dir}")
+        lines.append("")
+
+    # Warn about creating GitHub repo if needed
+    if github_fetch and "github.com" in github_fetch:
+        create_url = github_fetch.replace(".git", "").rstrip("/")
+        lines.append("")
+        lines.append(f"# If the GitHub repo doesn't exist yet, create it first:")
+        lines.append(f"#   https://github.com/new  (or: gh repo create)")
+        lines.append(f"# Then push: git push -u github main")
+
+    lines.append("")
+    lines.append("# Add clanker machine remote (requires SSH access via 'claude' alias)")
+    lines.append(f"git remote add clanker {clanker_url}")
+
+    if claude_base_remote:
+        lines.append("")
+        lines.append("# Add claude-base template remote")
+        lines.append(f"git remote add claude-base {claude_base_remote['fetch']}")
+
+    for r in upstream_remotes:
+        lines.append("")
+        lines.append(f"# Add upstream remote")
+        lines.append(f"git remote add upstream {r['fetch']}")
+
+    return "\n".join(lines)
 
 
 # ---------------------------------------------------------------------------
@@ -443,12 +571,17 @@ def collect(config):
 
         prep = parse_prep(path / "clanker-prep.json")
 
+        remotes = read_git_remotes(path)
+        clone_commands = make_clone_commands(path, remotes)
+
         projects.append({
-            "name":         name,
-            "path":         str(path),
-            "runs":         all_runs[:MAX_RUNS],
-            "prep":         prep,          # None or {"decision": ..., "reasons": [...]}
-            "token_stats":  token_stats,   # day/week/life token+cost totals (issue #11)
+            "name":           name,
+            "path":           str(path),
+            "runs":           all_runs[:MAX_RUNS],
+            "prep":           prep,           # None or {"decision": ..., "reasons": [...]}
+            "token_stats":    token_stats,    # day/week/life token+cost totals (issue #11)
+            "remotes":        remotes,        # list of {name, fetch, push} (issue #16)
+            "clone_commands": clone_commands, # bash setup snippet (issue #16)
         })
     print("Reading spawner log...")
     spawner_events = load_spawner_log()
@@ -775,10 +908,21 @@ def render_project_html(proj, now, rates=None):
     prep_html  = render_prep_html(proj.get("prep"))
     stats_html = render_token_stats_html(proj.get("token_stats"), rates or {})
 
+    # Clone button: opens the clone-commands overlay (issue #16)
+    clone_cmds = proj.get("clone_commands", "")
+    if clone_cmds:
+        clone_attr = html.escape(clone_cmds, quote=True)
+        clone_btn = (
+            f' <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1 clone-btn"'
+            f' data-clone-cmds="{clone_attr}" title="Show clone commands">clone</button>'
+        )
+    else:
+        clone_btn = ""
+
     return f"""
   <div class="col-12 col-md-6 col-xl-4 col-xxl-3">
     <section class="project-section h-100" id="proj-{proj_id}">
-      <h2 class="h5">{name}</h2>
+      <h2 class="h5">{name}{clone_btn}</h2>
       <p class="text-muted small mb-2">{path}</p>
       {prep_html}
       {stats_html}

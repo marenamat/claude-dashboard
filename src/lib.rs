@@ -287,11 +287,12 @@ struct SpawnEvent {
 }
 
 struct ProjectView {
-  name:        String,
-  path:        String,
-  runs:        Vec<RunView>,
-  prep:        Option<PrepView>,
-  token_stats: Option<TokenStats>,
+  name:           String,
+  path:           String,
+  runs:           Vec<RunView>,
+  prep:           Option<PrepView>,
+  token_stats:    Option<TokenStats>,
+  clone_commands: String,  // bash setup snippet (issue #16), empty if unavailable
 }
 
 fn parse_prep(v: &ciborium::value::Value) -> PrepView {
@@ -356,7 +357,9 @@ fn parse_project(v: &ciborium::value::Value) -> ProjectView {
     Some(v @ ciborium::value::Value::Map(_)) => Some(parse_token_stats(v)),
     _ => None,
   };
-  ProjectView { name, path, runs, prep, token_stats }
+  // clone_commands is a pre-formatted bash snippet (issue #16)
+  let clone_commands = val_as_str(&map, "clone_commands");
+  ProjectView { name, path, runs, prep, token_stats, clone_commands }
 }
 
 fn parse_denial(v: &ciborium::value::Value) -> (String, String) {
@@ -695,10 +698,20 @@ fn render_project(proj: &ProjectView, now_secs: i64, tz_offset_secs: i64, rates:
     .map(|s| render_token_stats(s, rates))
     .unwrap_or_default();
 
+  // Clone button: opens an overlay with bash setup commands (issue #16)
+  let clone_btn = if !proj.clone_commands.is_empty() {
+    format!(
+      r#" <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1 clone-btn" data-clone-cmds="{cmds}" title="Show clone commands">clone</button>"#,
+      cmds = esc(&proj.clone_commands),
+    )
+  } else {
+    String::new()
+  };
+
   format!(
     r#"<div class="col-12 col-md-6 col-xl-4 col-xxl-3">
 <section class="project-section h-100" id="proj-{id}">
-  <h2 class="h5">{name}</h2>
+  <h2 class="h5">{name}{clone_btn}</h2>
   <p class="text-muted small mb-2">{path}</p>
   {prep_html}
   {stats_html}
@@ -721,6 +734,7 @@ fn render_project(proj: &ProjectView, now_secs: i64, tz_offset_secs: i64, rates:
 </div>"#,
     id         = esc(&proj.name),
     name       = esc(&proj.name),
+    clone_btn  = clone_btn,
     path       = esc(&proj.path),
     prep_html  = prep_html,
     stats_html = stats_html,
