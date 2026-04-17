@@ -139,31 +139,40 @@ jobs:
       # -----------------------------------------------------------------------
       - name: Build Alpine APK
         run: |
+          set -x
+          echo "PKGVER=${PKGVER}"
+          ls /tmp/claude-dashboard-${PKGVER}.tar.gz
           mkdir -p /tmp/apk-build /tmp/apk-out
-          cp /tmp/claude-dashboard-$PKGVER.tar.gz /tmp/apk-build/
-          # Instantiate APKBUILD with the correct version
-          sed "s/__PKGVER__/$PKGVER/" packaging/APKBUILD > /tmp/apk-build/APKBUILD
+          cp /tmp/claude-dashboard-${PKGVER}.tar.gz /tmp/apk-build/
+          sed "s/__PKGVER__/${PKGVER}/" packaging/APKBUILD > /tmp/apk-build/APKBUILD
+          docker version --format '{{.Server.Version}}'
 
           docker run --rm \
-            -e PKGVER="$PKGVER" \
+            -e PKGVER="${PKGVER}" \
             -v /tmp/apk-build:/work \
             -v /tmp/apk-out:/out \
             alpine:3.21 sh -c '
               set -ex
               apk add --no-cache abuild
 
-              # Temporary signing key (package is not distributed via apk repos;
-              # the key is discarded after this build).
-              # -a: auto-name the key  -n: non-interactive  -i: install pub key to /etc/apk/keys/
+              # Generate a temporary signing key (discarded after build).
               mkdir -p /root/.abuild
-              abuild-keygen -a -n -i
-              echo "PACKAGER_PRIVKEY=\"$(ls /root/.abuild/*.rsa)\"" >> /root/.abuild/abuild.conf
+              abuild-keygen -a -n
+              ls -la /root/.abuild/
+
+              # Locate the private key; handle .rsa or alternative extensions.
+              PRIVKEY=$(ls /root/.abuild/*.rsa 2>/dev/null | head -1)
+              if [ -z "$PRIVKEY" ]; then
+                PRIVKEY=$(ls /root/.abuild/*.pem 2>/dev/null | head -1)
+              fi
+              if [ -z "$PRIVKEY" ]; then echo "ERROR: abuild-keygen produced no key"; exit 1; fi
+
+              # Install public key so apk trusts the signature.
+              cp "${PRIVKEY}.pub" /etc/apk/keys/
+              printf "PACKAGER_PRIVKEY=\"%s\"\n" "$PRIVKEY" > /root/.abuild/abuild.conf
 
               cd /work
-              # Compute SHA-512 checksum and update APKBUILD
               abuild -F checksum
-
-              # Build: REPODEST puts final .apk under /out
               REPODEST=/out abuild -Fr
             '
 
