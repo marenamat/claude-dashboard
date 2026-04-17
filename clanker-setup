@@ -26,11 +26,11 @@ git config --local user.email "vibecoding@jmq.cz"
 if which systemctl >/dev/null; then
 
   systemd=$HOME/.config/systemd/user/
+  mkdir -p $systemd
 
+  # Regular worker: runs every 4 minutes when idle
   tf=$systemd/$dirdd.timer
   sf=$systemd/$dirdd.service
-
-  mkdir -p $systemd
 
   cat >$tf <<EOT
 [Unit]
@@ -54,6 +54,33 @@ ExecStart=$selfdir/clanker-run
 WantedBy=default.target
 EOF
 
+  # Daily housekeeping: runs at 03:00 local time
+  htf=$systemd/${dirdd}-housekeeping.timer
+  hsf=$systemd/${dirdd}-housekeeping.service
+
+  cat >$htf <<EOT
+[Unit]
+Description=Claude Housekeeping Timer for $selfdir
+
+[Timer]
+OnCalendar=*-*-* 03:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOT
+
+  cat >$hsf <<EOF
+[Unit]
+Description=Claude Housekeeping Service for $selfdir
+
+[Service]
+ExecStart=$selfdir/clanker-housekeeping
+
+[Install]
+WantedBy=default.target
+EOF
+
   systemctl --user daemon-reload
 
 else
@@ -61,6 +88,7 @@ else
   CF=$(mktemp)
   crontab -l | grep -v "$selfdir" > $CF
   echo "*/10 * * * * $selfdir/clanker-run" >>$CF
+  echo "0 3 * * * $selfdir/clanker-housekeeping" >>$CF
   crontab $CF
   rm $CF
 

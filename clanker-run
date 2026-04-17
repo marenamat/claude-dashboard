@@ -68,9 +68,9 @@ restart_flag="$selfdir/.clanker-restart-$$"
     # Write clanker-current.json to signal a live session to the dashboard.
     # Fields: pid (for stale-detection), project, log_file (dashboard can tail
     # this for live stream-json lines), and live token/cost counters.
-    python3 - "$selfdir" "$BASHPID" "$start_time" "$tmp_out" "$current_json" <<'PYEOF'
+    python3 - "$selfdir" "$BASHPID" "$start_time" "$tmp_out" "$current_json" "${CLANKER_TASK:-}" <<'PYEOF'
 import sys, json
-selfdir, pid, start, log_file, out_path = sys.argv[1:]
+selfdir, pid, start, log_file, out_path, task = sys.argv[1:]
 record = {
     "pid":        int(pid),
     "start":      start,
@@ -81,6 +81,8 @@ record = {
     "tokens_out": 0,
     "cost_usd":   None,
 }
+if task:
+    record["task"] = task
 with open(out_path, "w") as f:
     json.dump(record, f)
     f.write("\n")
@@ -146,13 +148,15 @@ PYEOF
     python3 "$watcher_script" "$tmp_out" "$current_json" &
     watcher_pid=$!
 
-    # Run with stream-json so we can extract cost/token data
+    # Run with stream-json so we can extract cost/token data.
+    # CLANKER_PROMPT can be overridden by wrapper scripts (e.g. clanker-housekeeping).
+    prompt="${CLANKER_PROMPT:-proceed as the workflow specifies in CLAUDE.md}"
     ~/.local/bin/claude \
       -n "$selfdir" \
       --no-session-persistence \
       --output-format=stream-json \
       --verbose \
-      "proceed as the workflow specifies in CLAUDE.md" \
+      "$prompt" \
       </dev/null >"$tmp_out" 2>&1 || exit_code=$?
     exit_code=${exit_code:-0}
 
