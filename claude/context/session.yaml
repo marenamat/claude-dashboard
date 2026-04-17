@@ -2,24 +2,23 @@ recorded_at: '2026-04-18T00:00:00Z'
 
 ci_status:
   main: All pipelines (Build, Deploy, Package) green as of 2026-04-17T22:03:40Z.
-        Previous Package failures were fixed by the -d flag in issue-14-nodeps.
+        New runs started at 22:18 (in_progress at context fetch time).
 
 issues_pending_review:
-  - 14  # Package CI: -d flag fix (branch: issue-14-nodeps)
-  - 20  # spawner existing-dir fix (branch: issue-20-spawn-existing)
+  - 14  # packaging/config path: branch issue-14-config-path (latest: /etc/claude-dashboard/config.yaml)
+  - 20  # spawner existing-dir fix + spawn chorgly (in main; issue still open)
 
 issues_in_main_not_yet_closed:
-  - 16  # show clone commands overlay (merged to main; GitHub issue still open)
+  - 16  # show clone commands (merged to main; GitHub issue still open with "ping" comment)
 
 issues_blocked:
   - 9   # autoreload websocket server — needs py3-websockets package, see questions.md
   - 15  # spawner — needs crontab + config.yaml spawner section, see questions.md
 
-session_2026-04-18:
-  - Pipeline is fully green on main.
-  - Worked on issue #20: spawner.py raised ValueError when project directory
-    already existed. Fixed create_project() to skip clone/merge if dir exists,
-    but still write original-issue.json and register in config + crontab.
-  - Committed to branch issue-20-spawn-existing.
-  - questions.md: issues #9 and #15 still blocked on guardian action.
-  - issue #16 still open on GitHub despite being merged to main; guardian should close it.
+session_2026-04-18b:
+  - Implemented issue #14 comment: both generate-data.py and ws-server.py
+    now check /etc/claude-dashboard/config.yaml before SELFDIR/config.yaml.
+  - APKBUILD now creates /etc/claude-dashboard/ directory.
+  - Committed to branch issue-14-config-path.
+  - Issue #16 still open on GitHub (feature was merged; guardian should close it).
+  - Issue #20 still open; spawner existing-dir fix is in main.
