@@ -920,7 +920,7 @@ def render_project_html(proj, now, rates=None):
         clone_btn = ""
 
     return f"""
-  <div class="col-12 col-md-6 col-xl-4 col-xxl-3">
+  <div class="col-12 col-md-6 col-xxl-4">
     <section class="project-section h-100" id="proj-{proj_id}">
       <h2 class="h5">{name}{clone_btn}</h2>
       <p class="text-muted small mb-2">{path}</p>

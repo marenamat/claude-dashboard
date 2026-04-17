@@ -709,7 +709,7 @@ fn render_project(proj: &ProjectView, now_secs: i64, tz_offset_secs: i64, rates:
   };
 
   format!(
-    r#"<div class="col-12 col-md-6 col-xl-4 col-xxl-3">
+    r#"<div class="col-12 col-md-6 col-xxl-4">
 <section class="project-section h-100" id="proj-{id}">
   <h2 class="h5">{name}{clone_btn}</h2>
   <p class="text-muted small mb-2">{path}</p>

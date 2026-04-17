@@ -153,9 +153,10 @@ jobs:
 
               # Temporary signing key (package is not distributed via apk repos;
               # the key is discarded after this build).
+              # -a: auto-name the key  -n: non-interactive  -i: install pub key to /etc/apk/keys/
               mkdir -p /root/.abuild
-              abuild-keygen -a -n -q
-              echo "PACKAGER_PRIVKEY=\"$(ls /root/.abuild/*.rsa)\"" > /root/.abuild/abuild.conf
+              abuild-keygen -a -n -i
+              echo "PACKAGER_PRIVKEY=\"$(ls /root/.abuild/*.rsa)\"" >> /root/.abuild/abuild.conf
 
               cd /work
               # Compute SHA-512 checksum and update APKBUILD
