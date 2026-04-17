@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# spawner.py: Watch GitHub issues labelled ~SPAWN and create new projects.
+# spawner.py: Watch GitHub issues labelled SPAWN and create new projects.
 # Runs every 5 minutes from crontab.  Pure Python, no external dependencies
 # beyond what generate-data.py already uses (cbor2, pyyaml).
 #
@@ -28,7 +28,7 @@ SELFDIR      = Path(__file__).parent.resolve()
 CONFIG_PATH  = SELFDIR / "config.yaml"
 STATE_PATH   = SELFDIR / "spawner-state.yaml"
 LOG_PATH     = SELFDIR / "spawner-log.yaml"
-SPAWN_LABEL  = "~SPAWN"
+SPAWN_LABEL  = "SPAWN"
 # Safe name: lowercase letters, digits, hyphens, underscores only.
 RE_SAFE_NAME = re.compile(r'^[a-z0-9_-]+$')
 MAX_LOG_ENTRIES = 200
@@ -317,7 +317,7 @@ def main():
         print(f"spawner: issues fetch error: {err}", file=sys.stderr)
         sys.exit(1)
 
-    # Filter for ~SPAWN labelled issues not yet processed
+    # Filter for SPAWN labelled issues not yet processed
     spawn_issues = [
         i for i in issues
         if any(lb["name"] == SPAWN_LABEL for lb in i.get("labels", []))
