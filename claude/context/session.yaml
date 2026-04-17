@@ -1,35 +1,34 @@
-recorded_at: '2026-04-17T12:00:00Z'
+recorded_at: '2026-04-17T13:30:00Z'
 
 ci_status:
-  main: Package CI was failing (Build Alpine APK step) — fixed in issue-14-nginx branch
-  root_cause: APK version used git short SHA (hex chars invalid for APK version format)
-  fix: use git rev-list --count HEAD (pure decimal) — in issue-14-nginx branch
-  note: issue-14-nginx branch not yet merged to main
+  main: Package CI failing (Build Alpine APK) — root cause: git short SHA contains
+        hex chars invalid for APK version format; fix uses git rev-list --count HEAD.
+        Fix committed in issue-14-nginx branch, not yet merged to main.
 
 issues_pending_review:
   - 14  # nginx packaging + CI version fix (branch: issue-14-nginx)
-  - 19  # relative date format (branch: issue-19-dates)
-  - 10  # auto-approval badge in log overlay (branch: issue-10-log-overlay, this branch)
-  - 12  # offending action in denied permissions (branch: issue-12-denied-action)
+  - 19  # relative date format + DOW (branch: issue-19-dates)
+  - 10  # log overlay improvements: tool use, thinking, approved badge (branch: issue-10-log-overlay)
+  - 12  # denied permissions overlay + offending action (branch: issue-12-denied-action)
 
-issues_implemented_in_main_not_yet_closed:
-  - 18  # raise log processing limit (08fc3f1 in main)
-  - 17  # collapse no-work entries (911c894 in main)
-  - 16  # show clone commands (47ead3b in main)
-  - 4   # layout compact (1a43fce in main): col-12 col-md-6 col-xxl-4
+issues_in_main_not_yet_closed:
+  - 4   # layout compact: col-12 col-md-6 col-xxl-4 (2 cols@1200, 3 cols@1920) — 1a43fce
+  - 16  # show clone commands overlay — 47ead3b
+  - 17  # collapse no-work/limit-hit entries — 911c894
+  - 18  # raise log processing limit to 10 days — 08fc3f1
 
 issues_blocked:
-  - 9   # autoreload (needs py3-websockets installed + nginx setup, see questions.md)
+  - 9   # autoreload websocket server — needs py3-websockets package, see questions.md
+  - 15  # spawner — needs crontab + config.yaml spawner section, see questions.md
 
-session_2026-04-17b:
-  - Package CI root cause: git short SHA contains hex chars invalid for APK versions.
-    Fixed in issue-14-nginx branch.
-  - Issue #10 additional comment (4266019082):
-    Added "approved by config" green badge on tool_use entries in log overlay.
-    Two-pass: first scan user messages for tool_use_id→approval, then render.
-    This branch: issue-10-log-overlay (commit 7c3cf8d).
-  - Issue #12 additional comment (4263489021):
-    _parse_denial extracts clean command/path; overlay shows action in
-    red-bordered code block. Branch: issue-12-denied-action (commit 21dec0c).
-  - issue-17-collapse-no-work rebase failed — feature already in main (911c894).
-    Branch can be deleted by guardian.
+branches_stale:
+  - issue-17-collapse-no-work  # rebase failed; feature is in main; only context commit ahead
+
+session_2026-04-17c:
+  - Workflow check: no new issues, no new comments beyond what was already seen.
+  - All open issues either have branches pending review, are already in main, or are blocked.
+  - Package CI fix confirmed in issue-14-nginx branch (uses commit count, not hex SHA).
+  - Issue #4 layout: col-12 col-md-6 col-xxl-4 matches "2 cols@1200, 3 cols@1920" requirement.
+  - Issue #10 log overlay: tool use display, thinking collapsible, approved-by-config badge — all done.
+  - Issue #19 dates: 2..=3 for weekday names, older shows "dow dd mon hh:mm" — done in branch.
+  - Nothing new to implement this session; context updated and committed.
