@@ -1,13 +1,25 @@
 branches:
 - issue-10-log-overlay
 - issue-14-alpine-packaging
-- issue-15-project-spawner
+- issue-16-show-clone-commands
+- issue-17-collapse-no-work
 - main
 maintenance_actions:
 - fetched
-- 'rebased: issue-10-log-overlay'
+- main fast-forwarded
+- 'rebase_failed: issue-10-log-overlay'
 - 'rebased: issue-14-alpine-packaging'
-- 'rebase_failed: issue-15-project-spawner'
+- 'rebased: issue-15-project-spawner'
+- 'pruned: issue-15-project-spawner'
 - template_fetched
-- 'template_commit_failed: '
-recorded_at: '2026-04-17T06:25:08.209876+00:00'
+- template_up_to_date
+recorded_at: '2026-04-17T07:30:00.000000+00:00'
+session_work:
+- branch: issue-17-collapse-no-work
+  issue: 17
+  status: done
+  summary: Collapse consecutive no-work and limit-hit run entries into summary rows
+- branch: issue-16-show-clone-commands
+  issue: 16
+  status: done
+  summary: Show clone commands overlay per project
