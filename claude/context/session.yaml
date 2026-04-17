@@ -1,56 +1,42 @@
-recorded_at: '2026-04-17T14:00:00Z'
+recorded_at: '2026-04-17T17:00:00Z'
 
 ci_status:
-  main: Package CI failing (Build Alpine APK) — root cause: git short SHA contains
-        hex chars invalid for APK version format; fix uses git rev-list --count HEAD.
-        Fix committed in issue-14-nginx branch, not yet merged to main.
+  main: Package CI still failing (Build Alpine APK step, ~3 seconds) even after
+        version format fix merged to main. Diagnostics branch issue-14-ci-debug
+        adds set -x, pre-flight checks, and hardens abuild-keygen (removed -i flag,
+        manual pub key install, handles .rsa/.pem extensions). Root cause unknown
+        without actual log access (requires admin auth).
 
 issues_pending_review:
-  - 14  # nginx packaging + CI version fix (branch: issue-14-nginx)
-  - 19  # relative date format + DOW (branch: issue-19-dates)
-  - 10  # log overlay improvements: tool use, thinking, approved badge (branch: issue-10-log-overlay)
-  - 12  # denied permissions overlay + offending action (branch: issue-12-denied-action)
+  - 10  # log overlay: collapse raw-JSON dumps (branch: issue-10-raw-json)
+  - 14  # Package CI diagnostics + abuild-keygen hardening (branch: issue-14-ci-debug)
 
 issues_in_main_not_yet_closed:
-  - 4   # layout compact: col-12 col-md-6 col-xxl-4 (2 cols@1200, 3 cols@1920) — 1a43fce
-  - 16  # show clone commands overlay — 47ead3b
-  - 17  # collapse no-work/limit-hit entries — 911c894
-  - 18  # raise log processing limit to 10 days — 08fc3f1
+  - 4   # layout compact: col-12 col-md-6 col-xxl-4 — 1a43fce
+  - 9   # autoreload (partially in main via ws-server.py, but blocked on deps)
+  - 10  # log overlay improvements: most sub-tasks merged, raw-JSON collapse pending
+  - 12  # denied permissions overlay (merged to main)
+  - 16  # show clone commands overlay (merged to main)
+  - 17  # collapse no-work/limit-hit entries (merged to main)
+  - 18  # raise log processing limit to 10 days (merged to main)
+  - 19  # relative date format + DOW (merged to main)
 
 issues_blocked:
   - 9   # autoreload websocket server — needs py3-websockets package, see questions.md
   - 15  # spawner — needs crontab + config.yaml spawner section, see questions.md
 
 branches_stale:
-  - issue-17-collapse-no-work  # rebase failed; feature is in main; only context commit ahead
+  - issue-4-layout-compact  # feature in main; no unique commits; safe to delete
 
-session_2026-04-17c:
-  - Workflow check: no new issues, no new comments beyond what was already seen.
-  - All open issues either have branches pending review, are already in main, or are blocked.
-  - Package CI fix confirmed in issue-14-nginx branch (uses commit count, not hex SHA).
-  - Issue #4 layout: col-12 col-md-6 col-xxl-4 matches "2 cols@1200, 3 cols@1920" requirement.
-  - Issue #10 log overlay: tool use display, thinking collapsible, approved-by-config badge — all done.
-  - Issue #19 dates: 2..=3 for weekday names, older shows "dow dd mon hh:mm" — done in branch.
-  - Nothing new to implement this session; context updated and committed.
-
-session_2026-04-17d:
-  - Workflow check: no new issues, no new comments since session_2026-04-17c.
-  - State unchanged: 4 branches pending review (#10, #12, #14, #19), 4 issues in main not closed (#4, #16, #17, #18), 2 blocked (#9, #15).
-  - Package CI still failing; fix is in issue-14-nginx, awaiting guardian merge.
-  - issue-17-collapse-no-work rebase still failed; feature is in main — branch can be deleted by guardian.
-  - Nothing new to implement; context updated.
-
-session_2026-04-17e:
-  - Workflow check: no new issues, no new comments since session_2026-04-17d.
-  - State unchanged: same 4 branches pending review, same issues in main, same blocked.
-  - Package CI still failing; root cause confirmed as invalid APK version format (hex SHA chars); fix in issue-14-nginx awaiting guardian merge.
-  - Nothing new to implement; context updated.
-
-session_2026-04-17f:
-  - Discovered issue #10 comment 4267743666 ("remove top-level collapsing") was marked
-    seen but NOT implemented — the log record still used <details> at top level.
-  - Implemented: buildLogRecord now uses <div> + <div class="log-record-header"> instead
-    of <details>/<summary>; content blocks shown directly without click.
-  - Excerpt only shown in header for records without structured body (fallback JSON path).
-  - CSS updated: removed summary + ::before arrow rules, added .log-record-header rule.
-  - Committed as bb74b61 on issue-10-log-overlay.
+session_2026-04-17g:
+  - Package CI: "Build Alpine APK" fails in ~3 seconds consistently; version format
+    fix (git rev-list --count) already in main since 11:11 UTC but CI still failing.
+    Most recent failing run (24566073978) started at 12:53:51Z and completed at
+    12:53:54Z — only 3 seconds, implies failure before or immediately at Docker start.
+  - Issue #10 comment 4268155381 ("ok collapse the raw-JSON dumps and keep the known
+    uncollapsed"): implemented in branch issue-10-raw-json. Unknown record types and
+    unknown content blocks now use buildCollapsibleBlock() instead of bare <pre>.
+  - Package CI: created branch issue-14-ci-debug with set -x + docker version check
+    + explicit tarball verification + hardened abuild-keygen (no -i, manual pub key
+    copy, handles .rsa/.pem).
+  - Dropped stash (changes captured in their respective branches).
