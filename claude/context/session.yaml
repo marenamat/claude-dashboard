@@ -1,19 +1,19 @@
-recorded_at: '2026-04-17T18:30:00Z'
+recorded_at: '2026-04-17T20:00:00Z'
 
 ci_status:
-  main: Package CI fails consistently at "Build Alpine APK" step (~3 seconds).
-        ROOT CAUSE CONFIRMED: abuild-keygen sets SUDO via
+  main: Package CI still failing after the abuild-keygen fix.
+        NEW ROOT CAUSE: abuild -r (install build deps) uses the same
           SUDO="${SUDO-$(command -v doas || command -v sudo || echo doas)}"
-        In a minimal Alpine 3.21 container (only abuild installed, no doas/sudo),
-        SUDO becomes the literal string "doas". The -i flag causes it to run
-          "doas mkdir -p /etc/apk/keys"
-        which fails with exit 127 ("doas: not found") → set -e exits → step fails.
-        FIX: branch issue-14-ci-debug removes -i and manually copies pub key as root
-        (root needs no sudo). Branch is pending guardian review/merge.
+        pattern internally. With only abuild+fakeroot installed and no
+        doas/sudo, every $SUDO apk add call becomes "doas apk add ..."
+        which exits 127.
+        FIX: branch issue-14-sudo-fix adds "export SUDO=" before any abuild
+        invocation and installs fakeroot alongside abuild, so the container
+        runs all apk ops directly as root without a sudo wrapper.
+        Branch is pending guardian review/merge.
 
 issues_pending_review:
-  - 10  # log overlay: collapse raw-JSON dumps (branch: issue-10-raw-json)
-  - 14  # Package CI diagnostics + abuild-keygen fix (branch: issue-14-ci-debug)
+  - 14  # Package CI: SUDO= fix + fakeroot (branch: issue-14-sudo-fix)
 
 issues_in_main_not_yet_closed:
   - 16  # show clone commands overlay (merged to main; GitHub issue still open)
@@ -22,14 +22,14 @@ issues_blocked:
   - 9   # autoreload websocket server — needs py3-websockets package, see questions.md
   - 15  # spawner — needs crontab + config.yaml spawner section, see questions.md
 
-session_2026-04-17h:
-  - Confirmed root cause of Package CI failure: abuild-keygen -i tries to use
-    doas (via $SUDO) which is not installed in the minimal Alpine 3.21 container.
-    abuild-keygen source: SUDO="${SUDO-$(command -v doas || command -v sudo || echo doas)}"
-    With only abuild installed, SUDO="doas" (literal fallback), causing
-    "doas mkdir -p /etc/apk/keys" to fail with exit 127.
-  - The fix in issue-14-ci-debug (remove -i, manual cp as root) is correct.
-  - Issue #16 (clone commands) fully implemented in main across generate-data.py,
-    src/lib.rs, www/dashboard.js, www/dashboard.css, www/index.template.html.
-    GitHub issue still open; guardian must close it.
-  - All authorized open issues are either pending review or blocked. No new work.
+session_2026-04-17i:
+  - Package CI still failing after abuild-keygen fix (2b276d0).
+  - Root cause: abuild -r also uses $SUDO internally; with no doas/sudo installed,
+    it resolves to "doas" and fails with exit 127 on every privileged apk call.
+  - Fix: export SUDO= (empty) so abuild calls apk directly as root.
+  - Also added fakeroot to install list in case abuild needs it for package().
+  - Created branch issue-14-sudo-fix with the fix.
+  - Issue #16 confirmed implemented in main (commits 47ead3b, 3244f35);
+    GitHub issue still open awaiting guardian close.
+  - Design files unchanged; no new design requirements found.
+  - questions.md: issues #9 and #15 remain blocked on guardian action.
