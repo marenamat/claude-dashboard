@@ -393,6 +393,90 @@ fn parse_run(v: &ciborium::value::Value) -> RunView {
 }
 
 // ---------------------------------------------------------------------------
+// Run grouping: collapse consecutive no-work / limit-hit entries (issue #17)
+// ---------------------------------------------------------------------------
+
+// Classify a run for collapsing purposes.
+#[derive(PartialEq)]
+enum RunKind { Normal, NoWork, LimitHit }
+
+fn run_kind(run: &RunView) -> RunKind {
+  if run.limit_hit      { RunKind::LimitHit }
+  else if !run.invoked  { RunKind::NoWork }
+  else                  { RunKind::Normal }
+}
+
+// A display item is either a single run or a collapsed group.
+enum DisplayItem<'a> {
+  Single(&'a RunView),
+  // start_raw = oldest run in group, end_raw = newest run in group (display order is newest-first)
+  Collapsed { kind: RunKind, start_raw: &'a str, end_raw: &'a str, count: usize },
+}
+
+// Group runs into display items.  Runs arrive newest-first.
+// Groups of 2+ consecutive same-kind collapsible runs → Collapsed.
+fn group_runs(runs: &[RunView]) -> Vec<DisplayItem<'_>> {
+  let mut items: Vec<DisplayItem<'_>> = Vec::new();
+  let mut i = 0;
+  while i < runs.len() {
+    let kind = run_kind(&runs[i]);
+    if kind == RunKind::Normal {
+      items.push(DisplayItem::Single(&runs[i]));
+      i += 1;
+      continue;
+    }
+    // Find how many consecutive runs share this kind
+    let mut j = i + 1;
+    while j < runs.len() && run_kind(&runs[j]) == kind {
+      j += 1;
+    }
+    let count = j - i;
+    if count >= 2 {
+      // runs[i] is newest, runs[j-1] is oldest → "between oldest and newest"
+      items.push(DisplayItem::Collapsed {
+        kind,
+        start_raw: &runs[j - 1].start_raw,  // oldest
+        end_raw:   &runs[i].start_raw,       // newest
+        count,
+      });
+    } else {
+      items.push(DisplayItem::Single(&runs[i]));
+    }
+    i = j;
+  }
+  items
+}
+
+// Render one collapsed summary row.
+fn render_collapsed_row(kind: &RunKind, start_raw: &str, end_raw: &str, count: usize,
+  now_secs: i64, tz_offset_secs: i64, hidden: bool) -> String {
+
+  let start_disp = fmt_ts_relative(start_raw, now_secs, tz_offset_secs);
+  let end_disp   = fmt_ts_relative(end_raw,   now_secs, tz_offset_secs);
+
+  let (row_class_base, label) = match kind {
+    RunKind::NoWork   => ("text-muted",  "nothing to do"),
+    RunKind::LimitHit => ("table-danger","limit hit"),
+    RunKind::Normal   => unreachable!(),
+  };
+  let hidden_class = if hidden { " run-hidden d-none" } else { "" };
+  let row_class = format!("{row_class_base}{hidden_class}");
+
+  format!(
+    r#"<tr class="{row_class}">
+      <td colspan="5" class="text-center small fst-italic">
+        between {start} and {end} — {label} ({count} runs)
+      </td>
+    </tr>"#,
+    row_class = row_class,
+    start = esc(&start_disp),
+    end   = esc(&end_disp),
+    label = label,
+    count = count,
+  )
+}
+
+// ---------------------------------------------------------------------------
 // HTML rendering
 // ---------------------------------------------------------------------------
 
@@ -568,14 +652,23 @@ fn render_token_stats(stats: &TokenStats, rates: &ExchangeRates) -> String {
 fn render_project(proj: &ProjectView, now_secs: i64, tz_offset_secs: i64, rates: &ExchangeRates) -> String {
   // Cap total runs at SHOW_MAX (issue #7)
   let all_runs = &proj.runs[..proj.runs.len().min(SHOW_MAX)];
-  let total = all_runs.len();
+
+  // Group consecutive no-work / limit-hit runs into summary rows (issue #17)
+  let display_items = group_runs(all_runs);
+  let total = display_items.len();
 
   let rows: String = if total == 0 {
     r#"<tr><td colspan="5" class="text-muted">No runs recorded.</td></tr>"#.into()
   } else {
-    all_runs.iter().enumerate()
-      .map(|(i, r)| render_run_row(r, now_secs, tz_offset_secs, rates, i >= SHOW_INITIAL))
-      .collect()
+    display_items.iter().enumerate().map(|(i, item)| {
+      let hidden = i >= SHOW_INITIAL;
+      match item {
+        DisplayItem::Single(r) =>
+          render_run_row(r, now_secs, tz_offset_secs, rates, hidden),
+        DisplayItem::Collapsed { kind, start_raw, end_raw, count } =>
+          render_collapsed_row(kind, start_raw, end_raw, *count, now_secs, tz_offset_secs, hidden),
+      }
+    }).collect()
   };
 
   // tbody carries data-initial so JS knows how many rows to keep when collapsing

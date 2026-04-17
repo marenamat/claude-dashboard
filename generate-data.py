@@ -549,6 +549,69 @@ def fmt_cost(run):
     return "—"
 
 
+def run_kind(run):
+    """Classify a run for collapsing: 'limit_hit', 'no_work', or None (normal)."""
+    if run.get("limit_hit"):
+        return "limit_hit"
+    if not run.get("invoked"):
+        return "no_work"
+    return None
+
+
+def group_runs_for_display(runs):
+    """Group consecutive no-work/limit-hit runs into summary entries (issue #17).
+
+    Returns a list where each element is either:
+      - a run dict (normal run, or lone single of a collapsible kind)
+      - a dict {"_collapsed": True, "kind": ..., "start": datetime, "end": datetime, "count": int}
+
+    Runs arrive newest-first; collapsed groups show oldest→newest range.
+    Only groups of 2+ consecutive same-kind collapsible runs are collapsed.
+    """
+    result = []
+    i = 0
+    while i < len(runs):
+        kind = run_kind(runs[i])
+        if kind is None:
+            result.append(runs[i])
+            i += 1
+            continue
+        # Find consecutive runs of same kind
+        j = i + 1
+        while j < len(runs) and run_kind(runs[j]) == kind:
+            j += 1
+        count = j - i
+        if count >= 2:
+            # runs[i] is newest, runs[j-1] is oldest
+            result.append({
+                "_collapsed": True,
+                "kind":  kind,
+                "start": runs[j - 1]["start"],  # oldest
+                "end":   runs[i]["start"],       # newest
+                "count": count,
+            })
+        else:
+            result.append(runs[i])
+        i = j
+    return result
+
+
+def render_collapsed_row(item, now, hidden=False):
+    """Render a summary <tr> for a collapsed group of runs (issue #17)."""
+    start_str = html.escape(fmt_dt_relative(item["start"], now))
+    end_str   = html.escape(fmt_dt_relative(item["end"],   now))
+    label     = "nothing to do" if item["kind"] == "no_work" else "limit hit"
+    count     = item["count"]
+    base_cls  = "text-muted" if item["kind"] == "no_work" else "table-danger"
+    hidden_cls = " run-hidden d-none" if hidden else ""
+    return (
+        f'\n      <tr class="{base_cls}{hidden_cls}">'
+        f'<td colspan="5" class="text-center small fst-italic">'
+        f'between {start_str} and {end_str} \u2014 {label} ({count} runs)'
+        f'</td></tr>'
+    )
+
+
 def render_run_row(run, now, hidden=False):
     """Render one <tr> for a run.
 
@@ -678,15 +741,22 @@ def render_project_html(proj, now, rates=None):
     proj_id = html.escape(proj["name"])
     # Cap at SHOW_MAX (issue #7)
     runs = proj["runs"][:SHOW_MAX]
-    total = len(runs)
+
+    # Group consecutive no-work / limit-hit runs into summary rows (issue #17)
+    display_items = group_runs_for_display(runs)
+    total = len(display_items)
 
     if total == 0:
         all_rows = '<tr><td colspan="5" class="text-muted">No runs recorded.</td></tr>'
     else:
-        all_rows = "".join(
-            render_run_row(r, now, hidden=(i >= SHOW_INITIAL))
-            for i, r in enumerate(runs)
-        )
+        rows_parts = []
+        for i, item in enumerate(display_items):
+            hidden = i >= SHOW_INITIAL
+            if item.get("_collapsed"):
+                rows_parts.append(render_collapsed_row(item, now, hidden=hidden))
+            else:
+                rows_parts.append(render_run_row(item, now, hidden=hidden))
+        all_rows = "".join(rows_parts)
 
     tbody_id = html.escape(f"tbody-{proj['name']}")
 
