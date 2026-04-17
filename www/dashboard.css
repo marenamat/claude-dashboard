@@ -331,6 +331,13 @@ tr.table-warning td:first-child {
   border-radius: 0.2rem;
 }
 
+/* "approved by config" badge on tool_use entries (issue #10) */
+.log-auto-approved {
+  font-size: 0.65rem;
+  vertical-align: middle;
+  opacity: 0.85;
+}
+
 /* Labeled field (key: value) */
 .log-labeled-block {
   margin: 0.15rem 0;

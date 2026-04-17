@@ -151,10 +151,24 @@
       }
 
       if (isJsonl && records.length > 0) {
+        // First pass: build tool_use_id → true (auto-approved) / false (denied) map.
+        // A tool_result in a user message with is_error=false means the tool ran —
+        // i.e. it was approved by config (clanker never asks humans interactively).
+        var approvalMap = {};
+        records.forEach(function(rec) {
+          if (rec.type !== "user") return;
+          var content = (rec.message && Array.isArray(rec.message.content))
+            ? rec.message.content : [];
+          content.forEach(function(blk) {
+            if (blk.type === "tool_result" && blk.tool_use_id)
+              approvalMap[blk.tool_use_id] = !blk.is_error;
+          });
+        });
+
         // Pretty-printed JSONL
         var div = document.createElement("div");
         div.className = "log-pretty";
-        records.forEach(function(rec) { div.appendChild(buildLogRecord(rec)); });
+        records.forEach(function(rec) { div.appendChild(buildLogRecord(rec, approvalMap)); });
         body.appendChild(div);
       } else {
         // Raw text fallback
@@ -194,7 +208,8 @@
   // Build a <details class="log-record"> for one JSONL record.
   // For assistant/user records, render structured content blocks.
   // For other types, fall back to a JSON dump.
-  function buildLogRecord(rec) {
+  // approvalMap: optional {tool_use_id → bool} — built by showLogOverlay first pass.
+  function buildLogRecord(rec, approvalMap) {
     var det = document.createElement("details");
     det.className = "log-record";
 
@@ -223,7 +238,7 @@
       body.className = "log-record-body";
       var recType = rec.type || "";
       content.forEach(function(blk) {
-        body.appendChild(buildContentBlock(blk, recType));
+        body.appendChild(buildContentBlock(blk, recType, approvalMap));
       });
       det.appendChild(body);
     } else {
@@ -237,11 +252,12 @@
   }
 
   // Build a display element for one content block.
-  function buildContentBlock(blk, recType) {
+  // approvalMap: optional {tool_use_id → bool} passed through from showLogOverlay.
+  function buildContentBlock(blk, recType, approvalMap) {
     var bt = blk.type || "unknown";
     if (bt === "text")        return buildTextBlock(blk.text || "");
     if (bt === "thinking")    return buildCollapsibleBlock(blk.thinking || "", "log-block-thinking");
-    if (bt === "tool_use")    return buildToolUseBlock(blk);
+    if (bt === "tool_use")    return buildToolUseBlock(blk, approvalMap);
     if (bt === "tool_result") return buildToolResultBlock(blk);
 
     // Unknown: small JSON fallback
@@ -260,7 +276,9 @@
 
   // Tool use block: header with tool name, then each input field.
   // Primary fields (command, pattern, …) shown first and more prominently.
-  function buildToolUseBlock(blk) {
+  // approvalMap: optional {tool_use_id → bool} — if blk.id maps to true, show
+  //   a green "approved by config" badge (clanker never asks humans interactively).
+  function buildToolUseBlock(blk, approvalMap) {
     var div = document.createElement("div");
     div.className = "log-block log-block-tool-use";
 
@@ -271,6 +289,16 @@
     nameBadge.className = "log-tool-name";
     nameBadge.textContent = blk.name || "tool";
     hdr.appendChild(nameBadge);
+
+    // "approved by config" badge: shown when the tool ran successfully
+    if (approvalMap && blk.id && approvalMap[blk.id] === true) {
+      var appBadge = document.createElement("span");
+      appBadge.className = "badge bg-success ms-2 log-auto-approved";
+      appBadge.title = "Tool ran — approved by config (settings.json / CLAUDE.md)";
+      appBadge.textContent = "approved by config";
+      hdr.appendChild(appBadge);
+    }
+
     div.appendChild(hdr);
 
     var input = blk.input;
