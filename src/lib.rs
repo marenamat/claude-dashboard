@@ -290,12 +290,13 @@ struct SpawnEvent {
 }
 
 struct ProjectView {
-  name:           String,
-  path:           String,
-  runs:           Vec<RunView>,
-  prep:           Option<PrepView>,
-  token_stats:    Option<TokenStats>,
-  clone_commands: String,  // bash setup snippet (issue #16), empty if unavailable
+  name:            String,
+  path:            String,
+  runs:            Vec<RunView>,
+  prep:            Option<PrepView>,
+  token_stats:     Option<TokenStats>,
+  clone_commands:  String,  // bare git commands (issue #16), empty if unavailable
+  create_repo_url: String,  // URL to create GitHub repo, empty if not applicable (issue #16)
 }
 
 fn parse_prep(v: &ciborium::value::Value) -> PrepView {
@@ -360,9 +361,10 @@ fn parse_project(v: &ciborium::value::Value) -> ProjectView {
     Some(v @ ciborium::value::Value::Map(_)) => Some(parse_token_stats(v)),
     _ => None,
   };
-  // clone_commands is a pre-formatted bash snippet (issue #16)
-  let clone_commands = val_as_str(&map, "clone_commands");
-  ProjectView { name, path, runs, prep, token_stats, clone_commands }
+  // clone_commands is bare git commands; create_repo_url is a link to GitHub new-repo (issue #16)
+  let clone_commands  = val_as_str(&map, "clone_commands");
+  let create_repo_url = val_as_str(&map, "create_repo_url");
+  ProjectView { name, path, runs, prep, token_stats, clone_commands, create_repo_url }
 }
 
 fn parse_denial(v: &ciborium::value::Value) -> (String, String) {
@@ -704,8 +706,9 @@ fn render_project(proj: &ProjectView, now_secs: i64, tz_offset_secs: i64, rates:
   // Clone button: opens an overlay with bash setup commands (issue #16)
   let clone_btn = if !proj.clone_commands.is_empty() {
     format!(
-      r#" <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1 clone-btn" data-clone-cmds="{cmds}" title="Show clone commands">clone</button>"#,
-      cmds = esc(&proj.clone_commands),
+      r#" <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1 clone-btn" data-clone-cmds="{cmds}" data-create-url="{create_url}" title="Show clone commands">clone</button>"#,
+      cmds       = esc(&proj.clone_commands),
+      create_url = esc(&proj.create_repo_url),
     )
   } else {
     String::new()

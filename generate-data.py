@@ -86,7 +86,9 @@ def make_clone_commands(path, remotes):
       - upstream remote (non-origin, non-github, non-claude-base, outside github.com/marenamat)
       - clanker remote (SSH path based on project path relative to ~/)
 
-    Returns a string with the bash commands to type on a human machine.
+    Returns (commands_str, create_repo_url) where:
+      - commands_str: bare git commands, no comment lines
+      - create_repo_url: URL to create the GitHub repo (if applicable), else ""
     """
     home = Path.home()
     try:
@@ -120,45 +122,30 @@ def make_clone_commands(path, remotes):
     ]
 
     lines = []
+    create_repo_url = ""
 
     # Clone step
     if github_fetch:
-        lines.append(f"# Clone the repository")
         lines.append(f"git clone {github_fetch}")
         lines.append(f"cd {clone_dir}")
-        lines.append("")
-        # Set up github remote
-        lines.append("# Rename origin to 'github' and set SSH push URL")
-        lines.append("git remote rename origin github")
+        lines.append(f"git remote rename origin github")
         if github_push and github_push != github_fetch:
             lines.append(f"git remote set-url --push github {github_push}")
+        # Expose a link to create the repo on GitHub if it doesn't exist yet
+        if "github.com" in github_fetch:
+            create_repo_url = "https://github.com/new"
     else:
-        lines.append(f"# No GitHub remote found; clone manually and cd into {clone_dir}")
-        lines.append("")
+        lines.append(f"# clone manually and cd into {clone_dir}")
 
-    # Warn about creating GitHub repo if needed
-    if github_fetch and "github.com" in github_fetch:
-        create_url = github_fetch.replace(".git", "").rstrip("/")
-        lines.append("")
-        lines.append(f"# If the GitHub repo doesn't exist yet, create it first:")
-        lines.append(f"#   https://github.com/new  (or: gh repo create)")
-        lines.append(f"# Then push: git push -u github main")
-
-    lines.append("")
-    lines.append("# Add clanker machine remote (requires SSH access via 'claude' alias)")
     lines.append(f"git remote add clanker {clanker_url}")
 
     if claude_base_remote:
-        lines.append("")
-        lines.append("# Add claude-base template remote")
         lines.append(f"git remote add claude-base {claude_base_remote['fetch']}")
 
     for r in upstream_remotes:
-        lines.append("")
-        lines.append(f"# Add upstream remote")
-        lines.append(f"git remote add upstream {r['fetch']}")
+        lines.append(f"git remote add {r['name']} {r['fetch']}")
 
-    return "\n".join(lines)
+    return "\n".join(lines), create_repo_url
 
 
 # ---------------------------------------------------------------------------
@@ -599,16 +586,17 @@ def collect(config):
         prep = parse_prep(path / "clanker-prep.json")
 
         remotes = read_git_remotes(path)
-        clone_commands = make_clone_commands(path, remotes)
+        clone_commands, create_repo_url = make_clone_commands(path, remotes)
 
         projects.append({
-            "name":           name,
-            "path":           str(path),
-            "runs":           recent_runs,
-            "prep":           prep,           # None or {"decision": ..., "reasons": [...]}
-            "token_stats":    token_stats,    # day/week/life token+cost totals (issue #11)
-            "remotes":        remotes,        # list of {name, fetch, push} (issue #16)
-            "clone_commands": clone_commands, # bash setup snippet (issue #16)
+            "name":            name,
+            "path":            str(path),
+            "runs":            recent_runs,
+            "prep":            prep,             # None or {"decision": ..., "reasons": [...]}
+            "token_stats":     token_stats,      # day/week/life token+cost totals (issue #11)
+            "remotes":         remotes,           # list of {name, fetch, push} (issue #16)
+            "clone_commands":  clone_commands,   # bare git commands (issue #16)
+            "create_repo_url": create_repo_url,  # GitHub new-repo URL if applicable (issue #16)
         })
     print("Reading spawner log...")
     spawner_events = load_spawner_log()
@@ -938,12 +926,15 @@ def render_project_html(proj, now, rates=None):
     stats_html = render_token_stats_html(proj.get("token_stats"), rates or {})
 
     # Clone button: opens the clone-commands overlay (issue #16)
-    clone_cmds = proj.get("clone_commands", "")
+    clone_cmds      = proj.get("clone_commands", "")
+    create_repo_url = proj.get("create_repo_url", "")
     if clone_cmds:
-        clone_attr = html.escape(clone_cmds, quote=True)
+        cmds_attr   = html.escape(clone_cmds, quote=True)
+        create_attr = html.escape(create_repo_url, quote=True)
         clone_btn = (
             f' <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1 clone-btn"'
-            f' data-clone-cmds="{clone_attr}" title="Show clone commands">clone</button>'
+            f' data-clone-cmds="{cmds_attr}" data-create-url="{create_attr}"'
+            f' title="Show clone commands">clone</button>'
         )
     else:
         clone_btn = ""

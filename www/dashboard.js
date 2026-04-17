@@ -604,16 +604,27 @@
     root.querySelectorAll(".clone-btn").forEach(function(btn) {
       btn.addEventListener("click", function(e) {
         e.stopPropagation();
-        showCloneOverlay(btn.dataset.cloneCmds || "");
+        showCloneOverlay(btn.dataset.cloneCmds || "", btn.dataset.createUrl || "");
       });
     });
   }
 
-  function showCloneOverlay(cmds) {
+  function showCloneOverlay(cmds, createUrl) {
     var overlay = document.getElementById("clone-overlay");
     if (!overlay) return;
     var pre = overlay.querySelector(".clone-cmds");
     if (pre) pre.textContent = cmds;
+    // Show or hide the "create repo" note
+    var note = overlay.querySelector(".clone-create-note");
+    if (note) {
+      if (createUrl) {
+        var link = note.querySelector(".clone-create-link");
+        if (link) link.href = createUrl;
+        note.classList.remove("d-none");
+      } else {
+        note.classList.add("d-none");
+      }
+    }
     overlay.classList.remove("d-none");
     document.getElementById("clone-overlay-close").focus();
   }
