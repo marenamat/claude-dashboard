@@ -39,3 +39,9 @@ session_2026-04-17d:
   - Package CI still failing; fix is in issue-14-nginx, awaiting guardian merge.
   - issue-17-collapse-no-work rebase still failed; feature is in main — branch can be deleted by guardian.
   - Nothing new to implement; context updated.
+
+session_2026-04-17e:
+  - Workflow check: no new issues, no new comments since session_2026-04-17d.
+  - State unchanged: same 4 branches pending review, same issues in main, same blocked.
+  - Package CI still failing; root cause confirmed as invalid APK version format (hex SHA chars); fix in issue-14-nginx awaiting guardian merge.
+  - Nothing new to implement; context updated.
