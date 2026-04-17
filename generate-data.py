@@ -27,7 +27,7 @@ CONFIG_PATH  = SELFDIR / "config.yaml"
 SPAWNER_LOG  = SELFDIR / "spawner-log.yaml"   # written by spawner.py (issue #15)
 WWW = SELFDIR / "www"
 MAX_LOG_LINES = 40   # log lines kept per run
-MAX_RUNS = 50        # most recent runs kept per project
+MAX_DAYS = 10        # days of history kept per project (issue #18)
 SHOW_INITIAL = 5     # runs shown by default; rest behind "show more"
 SHOW_MAX = 1280      # hard cap on runs displayed per project (issue #7)
 
@@ -569,6 +569,10 @@ def collect(config):
         # Compute stats from ALL runs before capping for display (issue #11)
         token_stats = compute_token_stats(all_runs, now)
 
+        # Keep only the last MAX_DAYS days of history (issue #18)
+        cutoff = now - timedelta(days=MAX_DAYS)
+        recent_runs = [r for r in all_runs if r["start"] and r["start"] >= cutoff]
+
         prep = parse_prep(path / "clanker-prep.json")
 
         remotes = read_git_remotes(path)
@@ -577,7 +581,7 @@ def collect(config):
         projects.append({
             "name":           name,
             "path":           str(path),
-            "runs":           all_runs[:MAX_RUNS],
+            "runs":           recent_runs,
             "prep":           prep,           # None or {"decision": ..., "reasons": [...]}
             "token_stats":    token_stats,    # day/week/life token+cost totals (issue #11)
             "remotes":        remotes,        # list of {name, fetch, push} (issue #16)
