@@ -184,8 +184,8 @@ fn epoch_to_weekday(secs: i64) -> usize {
 // tz_offset_secs: local UTC offset in seconds (positive = east of UTC), e.g. +3600 for UTC+1.
 // - same local day  → "today HH:MM"
 // - 1 day ago       → "yesterday HH:MM"
-// - 2–5 days        → "weekday HH:MM"
-// - older           → "Apr 01, HH:MM"
+// - 2–3 days        → "weekday HH:MM"   (issue #19: only 3 days of relative names)
+// - older           → "Mon 01 Apr HH:MM" (issue #19: always include DOW with explicit date)
 fn fmt_ts_relative(ts: &str, now_secs: i64, tz_offset_secs: i64) -> String {
   let ts_secs = match parse_timestamp_secs(ts) {
     Some(v) => v,
@@ -207,20 +207,23 @@ fn fmt_ts_relative(ts: &str, now_secs: i64, tz_offset_secs: i64) -> String {
   let now_day = local_now.div_euclid(86400);
   let days_ago = now_day - ts_day;
 
-  const WEEKDAYS: [&str; 7] = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
-  const MONTHS:   [&str; 12] = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const WEEKDAYS:     [&str; 7]  = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+  const WEEKDAYS_ABB: [&str; 7]  = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const MONTHS:       [&str; 12] = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
   match days_ago {
     0      => format!("today {hhmm}"),
     1      => format!("yesterday {hhmm}"),
-    2..=5  => {
-      // Weekday of the local timestamp
+    2..=3  => {
+      // Weekday name for the past 2–3 days
       let wd = epoch_to_weekday(local_ts);
       format!("{} {hhmm}", WEEKDAYS[wd])
     }
     _ => {
+      // Older: show abbreviated DOW + day + month so the day of week is always visible
+      let wd = epoch_to_weekday(local_ts);
       let (_, m, d) = epoch_to_ymd(local_ts);
-      format!("{} {:02}, {hhmm}", MONTHS[(m - 1) as usize], d)
+      format!("{} {:02} {} {hhmm}", WEEKDAYS_ABB[wd], d, MONTHS[(m - 1) as usize])
     }
   }
 }

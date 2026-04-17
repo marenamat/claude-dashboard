@@ -644,8 +644,9 @@ def write_cbor(data, out_path):
 # Static HTML generation
 # ---------------------------------------------------------------------------
 
-WEEKDAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]
-MONTHS   = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+WEEKDAYS     = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]
+WEEKDAYS_ABB = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+MONTHS       = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
 
 def fmt_dt_relative(dt, now):
@@ -656,8 +657,8 @@ def fmt_dt_relative(dt, now):
 
     - same day        → "today HH:MM"
     - 1 day ago       → "yesterday HH:MM"
-    - 2–5 days ago    → "weekday HH:MM"
-    - older           → "Apr 01, HH:MM"
+    - 2–3 days ago    → "weekday HH:MM"          (issue #19: only 3 days of relative names)
+    - older           → "Mon 01 Apr HH:MM"        (issue #19: always show DOW with explicit date)
     """
     if dt is None:
         return "—"
@@ -668,16 +669,17 @@ def fmt_dt_relative(dt, now):
     now_day = now_utc.date()
     days_ago = (now_day - dt_day).days
     hhmm = dt_utc.strftime("%H:%M")
+    # weekday index: Sun=0, Mon=1, ..., Sat=6
+    wd = dt_day.isoweekday() % 7
     if days_ago == 0:
         return f"today {hhmm}"
     elif days_ago == 1:
         return f"yesterday {hhmm}"
-    elif 2 <= days_ago <= 5:
-        # weekday name of the run date (Monday=0 in Python isoweekday; we want Sun=0)
-        wd = dt_day.isoweekday() % 7  # Sun=0, Mon=1, ..., Sat=6
+    elif 2 <= days_ago <= 3:
         return f"{WEEKDAYS[wd]} {hhmm}"
     else:
-        return f"{MONTHS[dt_utc.month - 1]} {dt_utc.day:02d}, {hhmm}"
+        # Older: abbreviated DOW + day + month so the day of week is always visible
+        return f"{WEEKDAYS_ABB[wd]} {dt_utc.day:02d} {MONTHS[dt_utc.month - 1]} {hhmm}"
 
 
 def fmt_duration(run):
