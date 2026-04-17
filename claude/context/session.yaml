@@ -1,139 +1,35 @@
-recorded_at: '2026-04-06T16:00:00Z'
-branch: issue-2-separate-nginx
-status: waiting_for_ci_diagnosis
+recorded_at: '2026-04-17T00:00:00Z'
+branch: issue-4-layout-compact
+status: ready_for_review
+
 ci_status:
-  main: failing (origin/main at 32109a2, 14 consecutive failures)
-  wasm_pack_fix: merged to origin/main at 7d5b1e8 — CI still fails after this
-  wasm_bindgen_version_fix: merged to origin/main at 877ff43 — CI still fails after this
-  root_cause: unknown (GitHub API returns 403 on log downloads)
-  diagnostic: split ./build.sh into 4 sub-steps in 29ac7eb on this branch
-  next_action: push issue-2-separate-nginx so CI runs with split steps; report failing step
-issues:
-  - 1  # base implementation (done)
-  - 2  # separate nginx from local machine (done)
-deployment:
-  status: workflow added (deploy.yml)
-  note: GitHub Pages must be enabled by human guardian — see claude/questions.md
-  main_url: https://marenamat.github.io/claude-dashboard/
-  branch_url: https://marenamat.github.io/claude-dashboard/preview/<branch>/
-session_2026-04-05_fix:
-  - CI build was failing on main (run 24007256620).
-  - Root cause: src/lib.rs had two type errors in CBOR conversion helpers.
-  - Fixed by issue-1-base-implementation branch.
-session_2026-04-05_nginx_ipv6:
-  - nginx/dashboard.conf had IPv6 listen commented out.
-  - Fixed: enabled `listen [::]:8042;`.
-session_2026-04-05_ci_robustness:
-  - CI still failing after Rust fix. Added cargo cache and Bootstrap retries.
-  - Root cause remained unknown without CI logs.
-session_2026-04-05_ci_wasm_pack_removal:
-  - CI STILL failing on main (run 24008329844, SHA 0bced95) after all previous fixes.
-  - Root cause: wasm-pack downloads wasm-bindgen-cli/wasm-opt from GitHub releases
-    at build time — fails due to rate-limiting or version mismatch.
-  - Fix: replaced wasm-pack with direct cargo + wasm-bindgen-cli (see this branch).
-session_2026-04-05_issue2:
-  - Implemented two-machine nginx topology for issue #2.
-  - nginx/dashboard.conf (single-machine) removed.
-  - nginx/clanker.conf: standalone nginx config for clankers machine (HTTP, port 8042).
-  - nginx/proxy.conf: nginx sites-enabled snippet for proxy machine (HTTPS, proxies
-    to clankers machine on local network).
-  - etc/init.d/claude-dashboard: sysvinit LSB init script (start/stop/reload/restart/status).
-    Manages the nginx instance on the clankers machine via start-stop-daemon.
-  - claude/design/base.md: updated Nginx binding section to document the two-machine topology.
-session_2026-04-05_workflow_check:
-  - Both issues #1 and #2 are complete on issue-2-separate-nginx branch.
-  - CI failures on origin/main: wasm-pack approach still in main (fix in this branch).
-  - No new issues or design changes. Branch is ready for merge.
-  - GitHub Pages enablement still pending (human guardian action required).
-session_2026-04-05_deploy:
-  - Added .github/workflows/deploy.yml for branch preview deployments.
-  - Deploys main to gh-pages root; other branches to gh-pages/preview/<branch>/.
-  - Fixed stale nginx/dashboard.conf reference in build.sh.
-  - GitHub Pages needs to be enabled by human guardian (see claude/questions.md).
-session_2026-04-06_maintenance:
-  - Routine workflow run. No new issues or design changes.
-  - CI still failing on origin/main (7 consecutive failures with wasm-pack).
-  - Fix is in this branch (wasm-bindgen-cli approach, commit 7d5b1e8).
-  - Both issues #1 and #2 are complete. Branch ready for human to push/merge.
-  - Confirmed local main diverges from origin/main; clanker-prep fast-forwarded
-    local main but issue-2 branch is rebased on top of origin/main (0bced95).
-  - No action needed beyond committing updated context from clanker-prep.
-session_2026-04-06_maintenance_2:
-  - Routine maintenance run. No new issues or design changes.
-  - CI still failing on origin/main (wasm-pack, same root cause; fixes in this branch).
-  - Both issues #1 and #2 remain complete. Awaiting human guardian push/merge.
-  - Updated context from clanker-prep and committed.
-session_2026-04-06_maintenance_3:
-  - Routine maintenance run. No new issues or design changes.
-  - CI still failing on origin/main (7+ consecutive failures, same wasm-pack root cause).
-  - Both issues #1 and #2 remain complete. Branch ready for human guardian push/merge.
-  - clanker-prep updated context timestamps only (no substantive changes).
-  - local main diverges from origin/main; no action needed.
-session_2026-04-06_maintenance_4:
-  - Routine maintenance run. No new issues or design changes.
-  - CI still failing on origin/main (same wasm-pack root cause; 7 recorded failures).
-  - build_logs.zip from clanker-prep is a 403 error (no admin rights to download logs).
-  - Both issues #1 and #2 remain complete. Awaiting human guardian push/merge.
-  - No action needed.
-session_2026-04-06_maintenance_5:
-  - Routine maintenance run. No new issues or design changes.
-  - CI still failing on origin/main (same wasm-pack root cause; 7 recorded failures).
-  - Both issues #1 and #2 remain complete. Branch ready for human guardian push/merge.
-  - No action needed.
-session_2026-04-06_maintenance_6:
-  - Routine maintenance run. No new issues or design changes.
-  - CI still failing on origin/main (7 recorded failures, same wasm-pack root cause).
-  - Both issues #1 and #2 remain complete. Awaiting human guardian push/merge.
-  - No action needed.
-session_2026-04-06_maintenance_7:
-  - Routine maintenance run. No new issues or design changes.
-  - CI still failing on origin/main (7 recorded failures, same wasm-pack root cause).
-  - Both issues #1 and #2 remain complete. Awaiting human guardian push/merge.
-  - No action needed.
-session_2026-04-06_maintenance_8:
-  - Routine maintenance run. No new issues or design changes.
-  - CI still failing on origin/main (7 recorded failures, same wasm-pack root cause).
-  - Confirmed: remote main job step shows "Install wasm-pack" (old workflow).
-  - Fix (wasm-bindgen-cli approach) is in this branch, will resolve on merge.
-  - Both issues #1 and #2 remain complete. Awaiting human guardian push/merge.
-  - No action needed.
-session_2026-04-06_maintenance_9:
-  - Routine maintenance run. No new issues or design changes.
-  - CI still failing on origin/main (7 recorded failures, same wasm-pack root cause).
-  - Both issues #1 and #2 remain complete. Awaiting human guardian push/merge.
-  - No action needed.
-session_2026-04-06_maintenance_11:
-  - Routine maintenance run. No new issues or design changes.
-  - CI still failing on origin/main (7 recorded failures, same wasm-pack root cause).
-  - Both issues #1 and #2 remain complete. Awaiting human guardian push/merge.
-  - No action needed.
-session_2026-04-06_maintenance_14:
-  - pipeline_results.yaml updated: 12 failures now visible (5 new since last session).
-  - New failures at 08:56Z and 09:00Z on 2026-04-06 are from the wasm-bindgen-cli
-    workflow (post-fix), not the old wasm-pack workflow. CI STILL failing after fix.
-  - Cannot diagnose: GitHub API returns 403 on log download, no admin access.
-  - Action: split ./build.sh monolithic CI step into sub-steps (Bootstrap, Cargo WASM,
-    wasm-bindgen, Python datagen) in build.yml and deploy.yml. Next CI run will show
-    which specific sub-step fails.
-  - Updated questions.md to ask human guardian to report failing step.
-  - No open GitHub issues. No design changes.
-session_2026-04-06_maintenance_15:
-  - Reviewed pipeline results: still 12 failures on origin/main (latest at 09:00Z).
-  - Confirmed all previous CI fixes ARE on origin/main; CI STILL fails.
-  - issue-2-separate-nginx branch is 1 commit ahead of origin/main (29ac7eb: split CI).
-  - Branch has never been pushed (no remote tracking, no CI runs for it).
-  - local main diverges from origin/main: both have same self-improvement commit
-    (3a576a9 vs 6beb84a) with different SHAs due to independent history.
-  - No new GitHub issues. No design changes.
-  - Action needed: human guardian must push issue-2-separate-nginx to trigger CI
-    with split steps and report which step fails.
-session_2026-04-06_maintenance_16:
-  - New CI run at 11:31Z (run 24030167377) triggered by Maria's answers commit.
-  - Still failing: Install wasm-bindgen-cli succeeds, Build (./build.sh) fails.
-  - Rebase conflict resolved: issue-2-separate-nginx rebased onto 32109a2.
-  - deploy.yml updated: replaced gh-pages branch push with GitHub Actions Pages
-    deployment (actions/deploy-pages). Triggered by Maria's answer about "deploy
-    by actions" setting. Only runs on main branch now.
-  - questions.md updated: GitHub Pages question marked resolved.
-  - Build failure root cause still unknown. Sub-step split (29ac7eb) will diagnose
-    on next CI run. Human guardian must push issue-2-separate-nginx.
+  main: Package CI failing (Build Alpine APK step) since issue-14 was merged
+  root_cause: abuild-keygen -q flag is not valid; fixed in this branch
+  fix: replaced -q with -i in abuild-keygen call; use >> for abuild.conf
+
+issues_pending_review:
+  - 18  # raise log processing limit (branch: issue-18-log-limit)
+  - 4   # layout compact (branch: issue-4-layout-compact, this branch)
+
+issues_implemented_in_main_not_yet_closed:
+  - 17  # collapse no-work entries (911c894 in main)
+  - 16  # show clone commands (47ead3b in main)
+  - 14  # alpine packaging (0e6679f in main)
+  - 12  # display denied permissions (in main)
+  - 10  # display pretty logs (ad24d5f in main)
+
+issues_blocked:
+  - 9   # autoreload (needs py3-websockets, see questions.md)
+
+session_2026-04-17:
+  - Routine workflow run.
+  - Package CI (Build Alpine APK) failing since issue-14 introduced it.
+    Root cause: abuild-keygen -q is not a valid flag in Alpine 3.21.
+    Fix: use -i instead (installs pub key to /etc/apk/keys/); use >>
+    for abuild.conf append.
+  - Issue #4 (layout): changed col-xl-4 col-xxl-3 → col-xxl-4 in both
+    src/lib.rs and generate-data.py. Now: 2 cols at 1200px, 3 at 1920px.
+  - All other issue #4 requirements already done: colored invoked dot,
+    SHOW_INITIAL=5, relative date formatting.
+  - issue-17-collapse-no-work has only one extra context-update commit
+    beyond main; feature already merged. Branch can be deleted.
