@@ -145,7 +145,7 @@ jobs:
           mkdir -p /tmp/apk-build /tmp/apk-out
           cp /tmp/claude-dashboard-${PKGVER}.tar.gz /tmp/apk-build/
           sed "s/__PKGVER__/${PKGVER}/" packaging/APKBUILD > /tmp/apk-build/APKBUILD
-          docker version --format '{{.Server.Version}}'
+          cat /tmp/apk-build/APKBUILD
 
           docker run --rm \
             -e PKGVER="${PKGVER}" \
@@ -153,31 +153,46 @@ jobs:
             -v /tmp/apk-out:/out \
             alpine:3.21 sh -c '
               set -ex
-              # We run as root; tell abuild/abuild-keygen not to use doas/sudo,
-              # otherwise they fall back to the literal string "doas" when neither
-              # doas nor sudo is installed, causing exit 127.
-              export SUDO=
-              apk add --no-cache abuild fakeroot
+
+              # abuild 3.14.x (Alpine 3.21) uses $SUDO_APK (not $SUDO) for privilege
+              # escalation; "abuild-apk" wraps apk and handles root/non-root cases.
+              # We run entirely as root in this container, so skip dep installation
+              # with -d: our APKBUILD has no makedepends and only copies pre-built
+              # files, so no build tools are required at all.
+              apk add --no-cache abuild
 
               # Generate a temporary signing key (discarded after build).
               mkdir -p /root/.abuild
               abuild-keygen -a -n
+              echo "=== key files ==="
               ls -la /root/.abuild/
 
-              # Locate the private key; handle .rsa or alternative extensions.
+              # Locate the private key; abuild-keygen generates *.rsa by default.
               PRIVKEY=$(ls /root/.abuild/*.rsa 2>/dev/null | head -1)
               if [ -z "$PRIVKEY" ]; then
                 PRIVKEY=$(ls /root/.abuild/*.pem 2>/dev/null | head -1)
               fi
-              if [ -z "$PRIVKEY" ]; then echo "ERROR: abuild-keygen produced no key"; exit 1; fi
+              if [ -z "$PRIVKEY" ]; then echo "ERROR: no key generated"; exit 1; fi
 
               # Install public key so apk trusts the signature.
               cp "${PRIVKEY}.pub" /etc/apk/keys/
               printf "PACKAGER_PRIVKEY=\"%s\"\n" "$PRIVKEY" > /root/.abuild/abuild.conf
 
               cd /work
+              echo "=== workdir ==="
+              ls -la
+
+              # Compute checksums and update APKBUILD in-place.
               abuild -F checksum
-              REPODEST=/out abuild -Fr
+              echo "=== APKBUILD after checksum ==="
+              cat APKBUILD
+
+              # -F: allow running as root  -d: skip makedepends installation
+              # (we have no makedepends; -r would try to install build-base + all
+              # depends via abuild-apk which requires network and extra setup)
+              REPODEST=/out abuild -F -d
+              echo "=== output files ==="
+              find /out -type f
             '
 
       - name: Locate built APK
