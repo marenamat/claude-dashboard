@@ -1,4 +1,4 @@
-fetched_at: '2026-04-16T21:25:00.514611+00:00'
+fetched_at: '2026-04-17T06:25:08.209876+00:00'
 issues:
 - author: marenamat
   body: "Create a tool which would spawn new repositories.\n\nEvery issue in this\
@@ -96,21 +96,6 @@ issues:
   labels: []
   number: 6
   title: Machine-readable outputs
-- author: marenamat
-  body: 'Detect "You''ve hit your limit · resets 11pm" and display that as a warning
-    in that runner.
-
-
-    Find out how to get spent tokens from the jobs; would `--output-format=stream-json`
-    help?'
-  comments:
-  - author: marenamat
-    body: limit warning shown even if not hit
-    id: 4231186202
-  created_at: '2026-04-06T19:40:41Z'
-  labels: []
-  number: 5
-  title: Tokens and limits
 - author: marenamat
   body: '- Invoked: yes/no is enough to display just with a color
 

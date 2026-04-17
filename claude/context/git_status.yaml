@@ -1,33 +1,13 @@
 branches:
 - issue-10-log-overlay
-- issue-11-token-stats
-- issue-12-denied-permissions
 - issue-14-alpine-packaging
 - issue-15-project-spawner
 - main
 maintenance_actions:
 - fetched
-- main fast-forwarded
 - 'rebased: issue-10-log-overlay'
-- 'rebased: issue-11-token-stats'
-- 'rebased: issue-12-denied-permissions'
 - 'rebased: issue-14-alpine-packaging'
+- 'rebase_failed: issue-15-project-spawner'
 - template_fetched
-- template_up_to_date
-recorded_at: '2026-04-16T21:25:00.514611+00:00'
-branch_status:
-  issue-10-log-overlay:
-    state: stale
-    note: log overlay feature already on main; branch has only 1 context commit ahead; guardian can delete
-  issue-12-denied-permissions:
-    state: stale
-    note: denied permissions feature already on main; branch has no commits ahead; guardian can delete
-  issue-14-alpine-packaging:
-    state: merged
-    note: issue #14 closed; branch has commits ahead but issue no longer open; guardian can delete
-  issue-11-token-stats:
-    state: in_progress
-    note: 2 commits ahead of main; adds per-run multi-currency cost display and better log excerpt extraction
-  issue-15-project-spawner:
-    state: in_progress
-    note: new branch for project spawner feature; spawner.py, generate-data.py, and lib.rs updated
+- 'template_commit_failed: '
+recorded_at: '2026-04-17T06:25:08.209876+00:00'
