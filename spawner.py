@@ -225,13 +225,26 @@ def parse_issue(body):
 # Project creation
 # ---------------------------------------------------------------------------
 
-def create_project(name, upstream_url, base_dir, claude_base_url, issue_number, issue_data):
-    """
-    Clone claude-base into base_dir/name, optionally merge upstream, and return
-    the project directory path.  Raises on any fatal error.
+def check_github_repo_exists(org, name):
+    """Return True if https://github.com/<org>/<name> exists and is accessible."""
+    data, err = github_api(f"repos/{org}/{name}")
+    if err:
+        return False
+    return isinstance(data, dict) and "id" in data
 
-    If the directory already exists (project was set up manually), skip cloning
-    and upstream merge — just record the issue and return.
+
+def create_project(name, upstream_url, base_dir, claude_base_url, github_org,
+                   issue_number, issue_data):
+    """
+    Set up base_dir/name as a new project, then return the project directory path.
+    Raises on any fatal error.
+
+    Remote convention:
+      - 'claude-base' always points to claude_base_url (never 'origin')
+      - If marenamat/<name> exists on GitHub: clone from there (origin = GitHub)
+      - Otherwise: clone from claude-base, rename 'origin' to 'claude-base'
+
+    If the directory already exists (project was set up manually), skip cloning.
     """
     project_dir = (base_dir / name).resolve()
 
@@ -239,36 +252,63 @@ def create_project(name, upstream_url, base_dir, claude_base_url, issue_number, 
         # Project already exists; skip cloning, treat as pre-existing.
         print(f"spawner: {project_dir} already exists, skipping clone", file=sys.stderr)
     else:
-        # Clone claude-base
-        r = subprocess.run(
-            ["git", "clone", "--", claude_base_url, str(project_dir)],
-            capture_output=True, text=True,
-        )
-        if r.returncode != 0:
-            raise RuntimeError(f"git clone failed: {r.stderr.strip()}")
+        github_repo_url = f"https://github.com/{github_org}/{name}"
+        github_exists   = check_github_repo_exists(github_org, name)
 
-        # If upstream supplied, merge it into the clone
-        if upstream_url:
+        if github_exists:
+            # Clone the existing GitHub repo; origin = GitHub remote
+            print(f"spawner: cloning from GitHub: {github_repo_url}", file=sys.stderr)
             r = subprocess.run(
-                ["git", "remote", "add", "upstream", upstream_url],
+                ["git", "clone", "--", github_repo_url, str(project_dir)],
+                capture_output=True, text=True,
+            )
+            if r.returncode != 0:
+                raise RuntimeError(f"git clone from GitHub failed: {r.stderr.strip()}")
+            # Track claude-base as a named remote (never 'origin')
+            r = subprocess.run(
+                ["git", "remote", "add", "claude-base", claude_base_url],
                 capture_output=True, text=True, cwd=project_dir,
             )
             if r.returncode != 0:
-                raise RuntimeError(f"git remote add upstream failed: {r.stderr.strip()}")
+                raise RuntimeError(f"git remote add claude-base failed: {r.stderr.strip()}")
+        else:
+            # Clone claude-base, then rename 'origin' so claude-base is never 'origin'
+            print(f"spawner: no GitHub repo found, cloning claude-base", file=sys.stderr)
             r = subprocess.run(
-                ["git", "fetch", "upstream"],
+                ["git", "clone", "--", claude_base_url, str(project_dir)],
+                capture_output=True, text=True,
+            )
+            if r.returncode != 0:
+                raise RuntimeError(f"git clone failed: {r.stderr.strip()}")
+            r = subprocess.run(
+                ["git", "remote", "rename", "origin", "claude-base"],
                 capture_output=True, text=True, cwd=project_dir,
             )
             if r.returncode != 0:
-                raise RuntimeError(f"git fetch upstream failed: {r.stderr.strip()}")
-            # Merge upstream/main (allow unrelated histories for fresh clones)
-            r = subprocess.run(
-                ["git", "merge", "--allow-unrelated-histories", "-m",
-                 "chore: merge upstream into claude-base clone", "upstream/main"],
-                capture_output=True, text=True, cwd=project_dir,
-            )
-            if r.returncode != 0:
-                raise RuntimeError(f"git merge upstream failed: {r.stderr.strip()}")
+                raise RuntimeError(f"git remote rename failed: {r.stderr.strip()}")
+
+            # If upstream supplied, merge it into the fresh clone
+            if upstream_url:
+                r = subprocess.run(
+                    ["git", "remote", "add", "upstream", upstream_url],
+                    capture_output=True, text=True, cwd=project_dir,
+                )
+                if r.returncode != 0:
+                    raise RuntimeError(f"git remote add upstream failed: {r.stderr.strip()}")
+                r = subprocess.run(
+                    ["git", "fetch", "upstream"],
+                    capture_output=True, text=True, cwd=project_dir,
+                )
+                if r.returncode != 0:
+                    raise RuntimeError(f"git fetch upstream failed: {r.stderr.strip()}")
+                # Merge upstream/main (allow unrelated histories for fresh clones)
+                r = subprocess.run(
+                    ["git", "merge", "--allow-unrelated-histories", "-m",
+                     "chore: merge upstream into claude-base clone", "upstream/main"],
+                    capture_output=True, text=True, cwd=project_dir,
+                )
+                if r.returncode != 0:
+                    raise RuntimeError(f"git merge upstream failed: {r.stderr.strip()}")
 
     # Write original issue to claude/design/original-issue.json
     design_dir = project_dir / "claude" / "design"
@@ -301,6 +341,8 @@ def main():
     base_dir       = Path(spawner_cfg.get("base_dir", "~/claude")).expanduser()
     claude_base_url = spawner_cfg.get("claude_base_url",
                                        "https://github.com/marenamat/claude-base.git")
+    # Derive GitHub org from the repo setting (e.g. "marenamat/claude-dashboard" → "marenamat")
+    github_org = repo.split("/")[0] if repo else "marenamat"
 
     if not repo:
         print("spawner: no github_repo in config.yaml spawner section", file=sys.stderr)
@@ -347,12 +389,13 @@ def main():
         # Create the project
         try:
             project_dir = create_project(
-                name          = name,
-                upstream_url  = upstream_url,
-                base_dir      = base_dir,
+                name            = name,
+                upstream_url    = upstream_url,
+                base_dir        = base_dir,
                 claude_base_url = claude_base_url,
-                issue_number  = num,
-                issue_data    = {
+                github_org      = github_org,
+                issue_number    = num,
+                issue_data      = {
                     "number":     num,
                     "title":      title,
                     "body":       body,
