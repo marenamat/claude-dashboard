@@ -205,50 +205,52 @@
     });
   }
 
-  // Build a <details class="log-record"> for one JSONL record.
-  // For assistant/user records, render structured content blocks.
+  // Build a <div class="log-record"> for one JSONL record.
+  // For assistant/user records, render structured content blocks inline (no
+  // top-level collapsing — content shown directly, per issue #10 comment).
   // For other types, fall back to a JSON dump.
   // approvalMap: optional {tool_use_id → bool} — built by showLogOverlay first pass.
   function buildLogRecord(rec, approvalMap) {
-    var det = document.createElement("details");
-    det.className = "log-record";
+    var div = document.createElement("div");
+    div.className = "log-record";
 
-    var sum = document.createElement("summary");
+    var hdr = document.createElement("div");
+    hdr.className = "log-record-header";
 
     // Type badge
     var badge = document.createElement("span");
     badge.className = "log-type-badge " + logTypeBadgeClass(rec);
     badge.textContent = logTypeLabel(rec);
-    sum.appendChild(badge);
+    hdr.appendChild(badge);
 
-    // One-line excerpt
-    var exc = document.createElement("span");
-    exc.className = "log-record-excerpt";
-    exc.textContent = logExcerpt(rec);
-    sum.appendChild(exc);
-
-    det.appendChild(sum);
+    div.appendChild(hdr);
 
     // Body: structured content blocks for assistant/user; raw JSON for others
     var msg = (rec.message && typeof rec.message === "object") ? rec.message : null;
     var content = (msg && Array.isArray(msg.content)) ? msg.content : null;
 
     if (content && content.length > 0) {
+      // Structured body shown directly — no excerpt needed in header
       var body = document.createElement("div");
       body.className = "log-record-body";
       var recType = rec.type || "";
       content.forEach(function(blk) {
         body.appendChild(buildContentBlock(blk, recType, approvalMap));
       });
-      det.appendChild(body);
+      div.appendChild(body);
     } else {
-      // Fallback: full JSON
+      // No structured content: show a one-line excerpt in the header + JSON dump
+      var exc = document.createElement("span");
+      exc.className = "log-record-excerpt";
+      exc.textContent = logExcerpt(rec);
+      hdr.appendChild(exc);
+
       var pre = document.createElement("pre");
       pre.textContent = JSON.stringify(rec, null, 2);
-      det.appendChild(pre);
+      div.appendChild(pre);
     }
 
-    return det;
+    return div;
   }
 
   // Build a display element for one content block.

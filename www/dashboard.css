@@ -93,29 +93,16 @@ tr.table-warning td:first-child {
   border-bottom: none;
 }
 
-.log-record > summary {
+/* Header row: type badge + excerpt, always visible (no top-level collapsing) */
+.log-record > .log-record-header {
   display: flex;
   align-items: baseline;
   gap: 0.4rem;
   padding: 0.3rem 0.6rem;
-  cursor: pointer;
   color: #adb5bd;
-  user-select: none;
-  list-style: none;  /* hide default marker */
 }
 
-.log-record > summary::before {
-  content: "▶";
-  font-size: 0.6rem;
-  color: #6c757d;
-  flex-shrink: 0;
-}
-
-.log-record[open] > summary::before {
-  content: "▼";
-}
-
-/* Type badge inside log summary */
+/* Type badge inside log header */
 .log-type-badge {
   font-weight: bold;
   font-size: 0.7rem;
