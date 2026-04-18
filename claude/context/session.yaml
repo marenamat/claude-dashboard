@@ -1,10 +1,10 @@
-recorded_at: '2026-04-18T00:00:00Z'
+recorded_at: '2026-04-18T12:00:00Z'
 
 ci_status:
-  main: All pipelines (Build, Deploy, Package) green as of 2026-04-17T22:52:29Z.
+  main: All pipelines (Build, Deploy, Package) green as of 2026-04-18T11:40:56Z.
 
 issues_pending_review:
-  - 9   # cron fix + log dir: branch issue-9-cron-fix
+  - 9   # nginx APKBUILD bug fix: branch issue-9-cron-fix
 
 issues_in_main_not_yet_closed:
   - 21  # spawn from GitHub: already merged in cc9abac
@@ -13,13 +13,14 @@ issues_in_main_not_yet_closed:
 issues_blocked:
   - 15  # spawner — needs crontab + config.yaml spawner section, see questions.md
 
-session_2026-04-18d:
-  - Fixed issue #9 deployment bug: packaging/claude-dashboard-cron was checking
-    /usr/share/claude-dashboard/config.yaml but generate-data.py uses
-    /etc/claude-dashboard/config.yaml first. Cron never ran → dashboard stuck
-    showing empty CI-generated data.cbor. Fix: remove the guard, always run
-    generate-data.py (it handles config search itself).
-  - Added var/log/claude-dashboard to APKBUILD package() so log dir exists
-    immediately on install (OpenRC script also creates it at service start).
-  - Updated questions.md issue-9 section: APK already provides py3-websockets,
-    admin just needs to enable OpenRC service and copy nginx snippet.
+session_2026-04-18e:
+  - Diagnosed issue #9 WS 426 error: APKBUILD was installing nginx/clanker.conf
+    (a standalone full nginx config with http {} wrapper) as the package's nginx
+    snippet. Copying that into /etc/nginx/http.d/ would cause nginx to fail with
+    nested http {} blocks, and /ws would fall through to the static handler
+    returning 426 Upgrade Required.
+  - Fixed APKBUILD: now installs packaging/clanker.conf (the http.d-style snippet
+    with only a server {} block) instead of nginx/clanker.conf.
+  - Fixed packaging/clanker.conf comment: config path was /usr/share/claude-dashboard/
+    config.yaml but scripts use /etc/claude-dashboard/config.yaml.
+  - Updated questions.md to explain the bug and updated post-install steps.

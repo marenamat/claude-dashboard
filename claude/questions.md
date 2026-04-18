@@ -25,10 +25,15 @@ spawner:
 
 ## Required setup for issue-9 (Autoreload WebSocket server)
 
-The APK package already provides `py3-websockets` as a dependency, so no
-manual pip/apt install is needed. After installing the APK:
+**Note**: A bug in the APKBUILD was fixed (issue #9) — previously the package
+installed `nginx/clanker.conf` (the standalone full-nginx config with an
+`http {}` wrapper) instead of `packaging/clanker.conf` (the http.d snippet).
+Copying a full nginx config into `/etc/nginx/http.d/` breaks nginx (nested
+`http {}` blocks) and caused the 426 Upgrade Required WebSocket error.
 
-1. Copy the nginx config snippet and reload nginx:
+After installing the updated APK:
+
+1. Copy the nginx http.d snippet and reload nginx:
 
 ```
 cp /usr/share/claude-dashboard/nginx/clanker.conf /etc/nginx/http.d/
@@ -44,3 +49,6 @@ rc-service claude-dashboard-ws start
 
 3. Create `/etc/claude-dashboard/config.yaml` with your project paths if not
    done yet (the cron will generate data automatically every 15 minutes).
+
+The APK package already provides `py3-websockets` as a dependency, so no
+manual pip/apt install is needed.
