@@ -1,10 +1,12 @@
-recorded_at: '2026-04-18T12:00:00Z'
+recorded_at: '2026-04-18T14:00:00Z'
 
 ci_status:
-  main: All pipelines (Build, Deploy, Package) green as of 2026-04-18T11:40:56Z.
+  main: Package pipeline FAILED (run 24604124075) — APKBUILD referenced packaging/clanker.conf
+    which doesn't exist in the source tarball (it's at nginx/clanker.conf). Fix committed
+    to issue-9-cron-fix. Build and Deploy pipelines are green.
 
 issues_pending_review:
-  - 9   # APKBUILD fix for WS 426 error: branch issue-9-cron-fix
+  - 9   # APKBUILD clanker.conf path fix + WS IPv6 proxy: branch issue-9-cron-fix
   - 16  # duplicate clanker remote fix: branch issue-16-fix-clone-commands
   - 22  # denied permissions dependency doc: branch issue-22-denied-permissions
 
@@ -16,10 +18,10 @@ issues_blocked:
   - 15  # spawner — needs crontab + config.yaml spawner section, see questions.md
   - 22  # denied permissions — needs clanker-run changes in claude-base, see questions.md
 
-session_2026-04-18e:
-  - issue #9 APKBUILD fix (previous session): fixed nginx/clanker.conf vs
-    packaging/clanker.conf install path causing WS 426. Branch pending review.
-  - issue #16 clone commands: fixed duplicate clanker remote bug in make_clone_commands().
-    Branch: issue-16-fix-clone-commands.
-  - issue #22 denied permissions: documented dependency on clanker-run changes in
-    claude-base (questions.md). Branch: issue-22-denied-permissions.
+session_2026-04-18f:
+  - Package pipeline failing: APKBUILD had `packaging/clanker.conf` but tarball puts
+    the file at `nginx/clanker.conf`. Fixed to `nginx/clanker.conf` in packaging/APKBUILD.
+  - Rebased issue-22-denied-permissions and issue-16-fix-clone-commands onto main
+    (both had failed due to questions.md and session.yaml conflicts; resolved manually).
+  - questions.md has open items for guardian: issue-15 spawner, issue-9 nginx setup,
+    issue-22 clanker-run changes.

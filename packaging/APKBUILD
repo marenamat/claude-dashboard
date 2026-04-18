@@ -35,7 +35,7 @@ package() {
   # Nginx http.d snippet (admin copies to /etc/nginx/http.d/).
   # This is the Alpine-style snippet (server {} block only, no http {} wrapper).
   # We don't manage nginx ourselves — the admin installs nginx separately.
-  install -Dm644 packaging/clanker.conf \
+  install -Dm644 nginx/clanker.conf \
     "$pkgdir"/usr/share/claude-dashboard/nginx/clanker.conf
 
   # OpenRC init for the WebSocket autoreload server only (not nginx)
