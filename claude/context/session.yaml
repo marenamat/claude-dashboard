@@ -29,11 +29,17 @@ session_2026-04-18e:
   - Fixed packaging/clanker.conf comment: config path was /usr/share/claude-dashboard/
     config.yaml but scripts use /etc/claude-dashboard/config.yaml.
   - Updated questions.md to explain the bug and updated post-install steps.
-  - issue #16 clone commands: fixed duplicate clanker remote bug in make_clone_commands().
-    When source machine has a clanker remote, excluded from upstream_remotes to prevent
-    adding it twice. Branch: issue-16-fix-clone-commands.
-  - issue #22 denied permissions: documented dependency on clanker-run changes in
-    claude-base (questions.md). Branch: issue-22-denied-permissions.
+  - issue #16 clone commands: found duplicate clanker remote bug — when source machine
+    has a clanker remote it was being added twice. Fixed by excluding 'clanker' from
+    upstream_remotes in make_clone_commands(). Branch: issue-16-fix-clone-commands.
+  - issue #22 denied permissions: cannot show full tool-call args because Claude Code
+    CLI only logs the tool name (not args) when denying. Requires clanker-run changes
+    in claude-base to capture tool input from --output-format=stream-json. Documented
+    in questions.md. Branch: issue-22-denied-permissions.
+  - questions.md open questions (still pending guardian action):
+      * issue-15 spawner setup (crontab + config)
+      * issue-9 nginx conf copy + OpenRC service enable
+      * issue-22 clanker-run changes needed
 
 session_2026-04-18f:
   - Package pipeline failing: APKBUILD had `packaging/clanker.conf` but tarball puts
