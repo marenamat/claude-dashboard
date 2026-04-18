@@ -52,3 +52,37 @@ rc-service claude-dashboard-ws start
 
 The APK package already provides `py3-websockets` as a dependency, so no
 manual pip/apt install is needed.
+
+---
+
+## CSP inline script violation (issue #9)
+
+After the WS nginx config fix, a browser CSP error appeared:
+
+```
+Content-Security-Policy: The page's settings blocked an inline script
+(script-src-elem) from being executed because it violates the following
+directive: "script-src 'self' 'wasm-unsafe-eval'".
+Consider using a hash ('sha256-nCwXOGJ72MPizaTB2tzvBjGKo7v92xgmtZfSCjZwCWg=')
+or a nonce.
+```
+
+The current CSP in `packaging/clanker.conf` is:
+```
+script-src 'self' 'wasm-unsafe-eval'
+```
+
+We cannot find any inline `<script>` in our code (index.template.html, dashboard.js,
+generate-data.py, src/lib.rs). The hash suggests the browser is blocking a real
+inline script element.
+
+**Guardian: please check the following and report back:**
+
+1. Does this error appear on a fresh page load (no browser extensions)?
+2. Open browser DevTools → Sources → look for an inline script. What file/context
+   is it in?
+3. Does it appear when accessing `localhost:8042` directly (no HTTPS proxy)?
+4. Does the page still work despite the error, or is something broken?
+
+If the hash is stable across reloads, we can whitelist it in the CSP as a
+temporary fix while investigating the source.

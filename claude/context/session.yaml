@@ -42,3 +42,14 @@ session_2026-04-18f:
     (both had failed due to questions.md and session.yaml conflicts; resolved manually).
   - questions.md has open items for guardian: issue-15 spawner, issue-9 nginx setup,
     issue-22 clanker-run changes.
+
+session_2026-04-18g:
+  - git_status shows issue-22-denied-permissions rebase failed again (session.yaml conflict).
+  - Pipelines all green on main.
+  - issue #9: CSP inline script violation (sha256-nCwXOGJ72MPizaTB2tzvBjGKo7v92xgmtZfSCjZwCWg=)
+    appeared in guardian testing. Cannot find source in our code. Added to questions.md for
+    guardian investigation.
+  - issue #16: make_clone_commands() code verified correct — generates all 6 commands
+    (clone, cd, rename, set-url, add clanker, add claude-base). If guardian still sees only
+    the clone command, they may be running an old APK; should reinstall latest and rerun cron.
+  - Fixing issue-22-denied-permissions branch rebase.
