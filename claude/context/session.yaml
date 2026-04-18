@@ -43,6 +43,13 @@ session_2026-04-18f:
   - questions.md has open items for guardian: issue-15 spawner, issue-9 nginx setup,
     issue-22 clanker-run changes.
 
+session_2026-04-18i:
+  - Rebased issue-9-cron-fix onto origin/main (guardian had pushed 3 commits
+    including "question replies"). Skipped 3 stale context-only commits conflicting
+    in session.yaml (already in origin/main). Resolved questions.md conflict by
+    keeping my rewritten version.
+  - issue-22-denied-permissions branch still needs rebasing onto origin/main.
+
 session_2026-04-18h:
   - Guardian replied to questions: CSP is a browser extension (no action needed); WS
     still fails but "the nginx config was not the problem".
