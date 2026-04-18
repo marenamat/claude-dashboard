@@ -931,7 +931,9 @@ def render_project_html(proj, now, rates=None):
     clone_cmds      = proj.get("clone_commands", "")
     create_repo_url = proj.get("create_repo_url", "")
     if clone_cmds:
-        cmds_attr   = html.escape(clone_cmds, quote=True)
+        # Encode newlines as &#10; so the HTML parser doesn't normalize them
+        # to spaces when reading data-clone-cmds back via dataset.cloneCmds.
+        cmds_attr   = html.escape(clone_cmds, quote=True).replace("\n", "&#10;")
         create_attr = html.escape(create_repo_url, quote=True)
         clone_btn = (
             f' <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1 clone-btn"'
