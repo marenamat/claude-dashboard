@@ -293,7 +293,8 @@ def _parse_denial(d):
         return {"tool": str(d), "input": ""}
     # Try common field names for the tool name
     tool = d.get("name") or d.get("tool_name") or d.get("tool") or "unknown"
-    inp  = d.get("input") or d.get("command") or ""
+    # Claude Code stream-json uses "tool_input"; other formats use "input" or "command"
+    inp  = d.get("input") or d.get("tool_input") or d.get("command") or ""
     if isinstance(inp, dict):
         # Extract the most meaningful value for each known tool type
         if "command" in inp:

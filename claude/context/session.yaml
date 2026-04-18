@@ -81,3 +81,13 @@ session_2026-04-18g:
   - Fixed issue-22-denied-permissions rebase: conflict in session.yaml (3e3845a
     added session_2026-04-18e content already present on main). Resolved by keeping
     main's version; rebase completed successfully.
+
+session_2026-04-18h:
+  - issue #22 fix: Claude Code stream-json result record includes permission_denials
+    with full tool_input dict (e.g. {"command": "ls /foo"}), but _parse_denial() was
+    looking for "input" key not "tool_input". Fixed by adding d.get("tool_input")
+    to the lookup chain. The data was always there; just not being extracted.
+    Removed the outdated "dependency on clanker-run" section from questions.md.
+  - issues_pending_review: #16, #22 (generate-data.py fix)
+  - issues_blocked: #9 (guardian needs to install new APK, enable ws service),
+      #15 (guardian needs crontab + config.yaml spawner section)
