@@ -52,4 +52,6 @@ session_2026-04-18g:
   - issue #16: make_clone_commands() code verified correct — generates all 6 commands
     (clone, cd, rename, set-url, add clanker, add claude-base). If guardian still sees only
     the clone command, they may be running an old APK; should reinstall latest and rerun cron.
-  - Fixing issue-22-denied-permissions branch rebase.
+  - Fixed issue-22-denied-permissions rebase: conflict in session.yaml (3e3845a
+    added session_2026-04-18e content already present on main). Resolved by keeping
+    main's version; rebase completed successfully.
