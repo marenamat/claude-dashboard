@@ -23,31 +23,24 @@ spawner:
 
 ---
 
-## Required package for issue-9 (Autoreload WebSocket server)
+## Required setup for issue-9 (Autoreload WebSocket server)
 
-`ws-server.py` uses the `websockets` Python library (async WebSocket server).
+The APK package already provides `py3-websockets` as a dependency, so no
+manual pip/apt install is needed. After installing the APK:
 
-```
-pip install websockets
-```
-
-Or via system package if available:
+1. Copy the nginx config snippet and reload nginx:
 
 ```
-apt install python3-websockets
+cp /usr/share/claude-dashboard/nginx/clanker.conf /etc/nginx/http.d/
+rc-service nginx reload
 ```
 
-After installing, enable and start the new sysvinit service:
+2. Enable and start the WebSocket autoreload service:
 
 ```
-chmod +x /home/maria/claude/claude-dashboard/etc/init.d/claude-dashboard-ws
-cp etc/init.d/claude-dashboard-ws /etc/init.d/
-update-rc.d claude-dashboard-ws defaults
-service claude-dashboard-ws start
+rc-update add claude-dashboard-ws
+rc-service claude-dashboard-ws start
 ```
 
-Also reload nginx after updating `nginx/clanker.conf`:
-
-```
-nginx -s reload -c /path/to/nginx/clanker.conf
-```
+3. Create `/etc/claude-dashboard/config.yaml` with your project paths if not
+   done yet (the cron will generate data automatically every 15 minutes).

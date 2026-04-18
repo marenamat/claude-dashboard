@@ -48,4 +48,7 @@ package() {
   # Config directory: scripts look here first for config.yaml.
   # The admin provides the actual config; we just create the directory.
   install -d "$pkgdir"/etc/claude-dashboard
+
+  # Log directory: used by the cron data-refresh job and the ws-server init script.
+  install -d "$pkgdir"/var/log/claude-dashboard
 }

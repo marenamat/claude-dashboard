@@ -1,23 +1,25 @@
 recorded_at: '2026-04-18T00:00:00Z'
 
 ci_status:
-  main: All pipelines (Build, Deploy, Package) green as of 2026-04-17T22:32:50Z.
+  main: All pipelines (Build, Deploy, Package) green as of 2026-04-17T22:52:29Z.
 
 issues_pending_review:
-  - 14  # packaging/config path: branch issue-14-config-path (latest: /etc/claude-dashboard/config.yaml)
-  - 21  # spawn from GitHub: branch issue-21-spawn-from-github
-  - 16  # clone overlay link fix: branch issue-16-clone-link-fix
+  - 9   # cron fix + log dir: branch issue-9-cron-fix
 
-issues_in_main_not_yet_closed: []
+issues_in_main_not_yet_closed:
+  - 21  # spawn from GitHub: already merged in cc9abac
+  - 16  # clone overlay link fix: already merged in 2cb18fd
 
 issues_blocked:
-  - 9   # autoreload websocket server — needs py3-websockets package, see questions.md
   - 15  # spawner — needs crontab + config.yaml spawner section, see questions.md
 
-session_2026-04-18c:
-  - Implemented issue #21: spawner.py now checks if marenamat/<name> exists on
-    GitHub; if yes, clones from there (origin=GitHub) and adds claude-base remote.
-    If no, clones claude-base and renames origin→claude-base. Branch: issue-21-spawn-from-github.
-  - Fixed issue #16 feedback: make_clone_commands() strips # comment lines from
-    output; create_repo_url returned as separate field; clone overlay now shows
-    "Create it on GitHub" as a real <a> link. Branch: issue-16-clone-link-fix.
+session_2026-04-18d:
+  - Fixed issue #9 deployment bug: packaging/claude-dashboard-cron was checking
+    /usr/share/claude-dashboard/config.yaml but generate-data.py uses
+    /etc/claude-dashboard/config.yaml first. Cron never ran → dashboard stuck
+    showing empty CI-generated data.cbor. Fix: remove the guard, always run
+    generate-data.py (it handles config search itself).
+  - Added var/log/claude-dashboard to APKBUILD package() so log dir exists
+    immediately on install (OpenRC script also creates it at service start).
+  - Updated questions.md issue-9 section: APK already provides py3-websockets,
+    admin just needs to enable OpenRC service and copy nginx snippet.

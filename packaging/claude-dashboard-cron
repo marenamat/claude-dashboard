@@ -1,9 +1,8 @@
 #!/bin/sh
 # Refresh Claude Dashboard data every 15 minutes via Alpine's crond.
-# Reads project paths from /usr/share/claude-dashboard/config.yaml
-# and writes the updated data to /usr/share/claude-dashboard/www/data.cbor.
-# Create config.yaml (see config.yaml.sample in the same directory) before
-# enabling this cron job.
-[ -f /usr/share/claude-dashboard/config.yaml ] &&
-  exec /usr/bin/python3 /usr/share/claude-dashboard/generate-data.py \
-    >>/var/log/claude-dashboard/generate-data.log 2>&1
+# Config is read from /etc/claude-dashboard/config.yaml (preferred) or
+# /usr/share/claude-dashboard/config.yaml (fallback). generate-data.py
+# handles the config search and creates a default if neither file exists.
+mkdir -p /var/log/claude-dashboard
+exec /usr/bin/python3 /usr/share/claude-dashboard/generate-data.py \
+  >>/var/log/claude-dashboard/generate-data.log 2>&1
