@@ -23,55 +23,6 @@ spawner:
 
 ---
 
-## WebSocket autoreload still failing (issue #9)
-
-The APKBUILD clanker.conf path fix and the IPv4→IPv6 proxy fix are now committed.
-The CSP error was confirmed to be a browser extension (no action needed).
-
-But the WebSocket still does not work.  To help diagnose, please check and
-report back:
-
-*The whole problem was caused by an overlay proxy outside of this package's
-reach. Now the websocket works.*
-
-1. **Is ws-server running?**
-
-   ```sh
-   ps aux | grep ws-server
-   ```
-
-2. **Does the log show any startup error?**
-
-   ```sh
-   cat /var/log/claude-dashboard/ws-server.log
-   ```
-
-   (or wherever it was started from — check `$LOGFILE` in your init script)
-
-3. **Can you connect directly to port 8043 with curl?**
-
-   ```sh
-   curl -v --http1.1 -H "Upgrade: websocket" -H "Connection: Upgrade" \
-        http://[::1]:8043/
-   ```
-
-   Expected: `101 Switching Protocols`.  If you get 426, the server is up but
-   not getting the Upgrade header.  If connection refused, the server is not
-   listening.
-
-4. **What does nginx return for /ws without the proxy?**
-
-   Access port 8042 directly from the clanker machine:
-
-   ```sh
-   curl -v --http1.1 -H "Upgrade: websocket" -H "Connection: Upgrade" \
-        http://[::1]:8042/ws
-   ```
-
-   Expected: `101 Switching Protocols` (nginx passes it through to ws-server).
-
----
-
 ## Required setup for issue-9 (Autoreload WebSocket server)
 
 After installing the updated APK (or running from the dev tree):

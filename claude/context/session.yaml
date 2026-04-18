@@ -1,22 +1,23 @@
-recorded_at: '2026-04-18T14:00:00Z'
+recorded_at: '2026-04-18T18:30:00Z'
 
 ci_status:
-  main: Package pipeline FAILED (run 24604124075) — APKBUILD referenced packaging/clanker.conf
-    which doesn't exist in the source tarball (it's at nginx/clanker.conf). Fix committed
-    to issue-9-cron-fix. Build and Deploy pipelines are green.
+  main: All pipelines green (Build, Package, Deploy).
 
 issues_pending_review:
-  - 9   # APKBUILD clanker.conf path fix + WS IPv6 proxy: branch issue-9-cron-fix
-  - 16  # duplicate clanker remote fix: branch issue-16-fix-clone-commands
-  - 22  # denied permissions dependency doc: branch issue-22-denied-permissions
+  - 16  # newline encoding fix for clone commands HTML attr: branch issue-16-fix-clone-newlines
+  - 22  # extract tool_input from permission_denials: branch issue-22-denied-permissions
 
-issues_in_main_not_yet_closed:
-  - 21  # spawn from GitHub: already merged in cc9abac
-  - 16  # clone overlay link fix: already merged in 2cb18fd (further fix in branch)
+issues_in_main:
+  - 9   # WS autoreload + cron fix: all commits merged (branch pruned)
+  - 21  # spawn from GitHub: merged in cc9abac
 
 issues_blocked:
   - 15  # spawner — needs crontab + config.yaml spawner section, see questions.md
-  - 22  # denied permissions — needs clanker-run changes in claude-base, see questions.md
+  - 9   # guardian still needs to enable ws service and copy nginx conf (see questions.md)
+
+questions_open:
+  - issue-15: crontab + spawner section in config.yaml
+  - issue-9: guardian must copy nginx conf and enable claude-dashboard-ws service
 
 session_2026-04-18e:
   - Diagnosed issue #9 WS 426 error: APKBUILD was installing nginx/clanker.conf
@@ -49,38 +50,18 @@ session_2026-04-18f:
   - questions.md has open items for guardian: issue-15 spawner, issue-9 nginx setup,
     issue-22 clanker-run changes.
 
-session_2026-04-18i:
-  - Rebased issue-9-cron-fix onto origin/main (guardian had pushed 3 commits
-    including "question replies"). Skipped 3 stale context-only commits conflicting
-    in session.yaml (already in origin/main). Resolved questions.md conflict by
-    keeping my rewritten version.
-  - issue-22-denied-permissions branch still needs rebasing onto origin/main.
-
-session_2026-04-18h:
-  - Guardian replied to questions: CSP is a browser extension (no action needed); WS
-    still fails but "the nginx config was not the problem".
-  - nginx/clanker.conf (standalone): fixed WS proxy from 127.0.0.1:8043 to [::1]:8043
-    (IPv6 requirement from CLAUDE.md).
-  - ws-server.py: no longer exits if config file not found; warns and starts with
-    empty project list so data.cbor reload still works without a config.
-  - ws-server.py: now sends current RUNNING state to newly connected clients (the
-    comment said it should but the code did not).
-  - questions.md: removed answered CSP question; added diagnostic steps for WS so
-    guardian can identify whether ws-server is running and whether nginx is forwarding
-    the Upgrade header correctly.
-
 session_2026-04-18g:
   - git_status shows issue-22-denied-permissions rebase failed again (session.yaml conflict).
   - Pipelines all green on main.
   - issue #9: CSP inline script violation (sha256-nCwXOGJ72MPizaTB2tzvBjGKo7v92xgmtZfSCjZwCWg=)
     appeared in guardian testing. Cannot find source in our code. Added to questions.md for
-    guardian investigation.
+    guardian investigation. Guardian later confirmed it was a browser extension (no action needed).
   - issue #16: make_clone_commands() code verified correct — generates all 6 commands
-    (clone, cd, rename, set-url, add clanker, add claude-base). If guardian still sees only
-    the clone command, they may be running an old APK; should reinstall latest and rerun cron.
-  - Fixed issue-22-denied-permissions rebase: conflict in session.yaml (3e3845a
-    added session_2026-04-18e content already present on main). Resolved by keeping
-    main's version; rebase completed successfully.
+    (clone, cd, rename, set-url, add clanker, add claude-base). Root cause: newlines
+    in HTML attribute were being normalized to spaces by the HTML parser, so JS only
+    saw a single line. Fix: encode newlines as &#10; in generate-data.py. Branch:
+    issue-16-fix-clone-newlines.
+  - Fixed issue-22-denied-permissions rebase.
 
 session_2026-04-18h:
   - issue #22 fix: Claude Code stream-json result record includes permission_denials
@@ -91,3 +72,12 @@ session_2026-04-18h:
   - issues_pending_review: #16, #22 (generate-data.py fix)
   - issues_blocked: #9 (guardian needs to install new APK, enable ws service),
       #15 (guardian needs crontab + config.yaml spawner section)
+
+session_2026-04-18i:
+  - Rebase of issue-22-denied-permissions onto main completed successfully.
+    Conflicts resolved: d418c4a (stale dependency doc — kept HEAD/main version),
+    0ced3a3 (removed issue-22 section from questions.md as resolved).
+  - issue-9-cron-fix branch pruned (all commits merged into main; WS works per guardian).
+  - questions.md cleaned up: removed stale WS diagnostic questions block (WS works now).
+  - Pipelines all green on main.
+  - Pending guardian merges: issue-16-fix-clone-newlines, issue-22-denied-permissions.
