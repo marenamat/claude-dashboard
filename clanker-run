@@ -165,6 +165,75 @@ PYEOF
     wait "$watcher_pid" 2>/dev/null || true
     watcher_pid=""
 
+    # Parse stream-json for denied tool calls and write them to the log
+    # before the raw stream, so they are easy to spot.
+    python3 - "$tmp_out" >>clanker.log <<'PYEOF' || true
+import sys, json
+
+tmp_path = sys.argv[1]
+pending = {}  # tool_use_id -> {name, input}
+
+try:
+    with open(tmp_path) as f:
+        for line in f:
+            s = line.strip()
+            if not s:
+                continue
+            try:
+                obj = json.loads(s)
+                t = obj.get("type")
+
+                if t == "assistant":
+                    content = (obj.get("message") or {}).get("content") or []
+                    for block in content:
+                        if isinstance(block, dict) and block.get("type") == "tool_use":
+                            tid = block.get("id", "")
+                            pending[tid] = {
+                                "name":  block.get("name", "unknown"),
+                                "input": block.get("input") or {},
+                            }
+
+                elif t == "user":
+                    content = (obj.get("message") or {}).get("content") or []
+                    for block in content:
+                        if not isinstance(block, dict):
+                            continue
+                        if block.get("type") != "tool_result":
+                            continue
+                        if not block.get("is_error"):
+                            continue
+                        rc = block.get("content") or ""
+                        if isinstance(rc, list):
+                            rc = " ".join(
+                                c.get("text", "") for c in rc if isinstance(c, dict)
+                            )
+                        if "denied" not in str(rc).lower():
+                            continue
+                        tid = block.get("tool_use_id", "")
+                        tool = pending.get(tid)
+                        if not tool:
+                            continue
+                        name = tool["name"]
+                        inp  = tool["input"]
+                        # Pick the most informative single field per tool type
+                        if name == "Bash":
+                            detail = inp.get("command", "")[:120]
+                        elif name in ("Read", "Write", "Edit", "Glob"):
+                            detail = inp.get("file_path") or inp.get("pattern", "")
+                        elif name == "Grep":
+                            detail = inp.get("pattern", "")
+                        elif inp:
+                            k, v = next(iter(inp.items()))
+                            detail = str(v)[:120]
+                        else:
+                            detail = ""
+                        print(f"Denied: {name}({detail})")
+            except Exception:
+                pass
+except Exception:
+    pass
+PYEOF
+
     # Append raw stream output to log (=== header and date were written above)
     cat "$tmp_out" >>clanker.log
     case "$exit_code" in
