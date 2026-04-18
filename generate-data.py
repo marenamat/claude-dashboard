@@ -114,10 +114,11 @@ def make_clone_commands(path, remotes):
     # claude-base remote
     claude_base_remote = remote_by_name.get("claude-base")
 
-    # upstream: remotes that are not origin/github/claude-base and outside marenamat
+    # upstream: remotes that are not origin/github/claude-base/clanker and outside marenamat
+    # (clanker is always added explicitly below, so skip it here to avoid duplicates)
     upstream_remotes = [
         r for r in remotes
-        if r["name"] not in ("origin", "github", "claude-base")
+        if r["name"] not in ("origin", "github", "claude-base", "clanker")
         and "github.com/marenamat" not in r["fetch"]
     ]
 
