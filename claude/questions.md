@@ -53,6 +53,8 @@ rc-service claude-dashboard-ws start
 The APK package already provides `py3-websockets` as a dependency, so no
 manual pip/apt install is needed.
 
+*The websocket still fails, the nginx config was not the problem.*
+
 ---
 
 ## CSP inline script violation (issue #9)
@@ -86,3 +88,5 @@ inline script element.
 
 If the hash is stable across reloads, we can whitelist it in the CSP as a
 temporary fix while investigating the source.
+
+*Page works, and the bug is from a browser extension. But the autoreload / WS still doesn't.*
