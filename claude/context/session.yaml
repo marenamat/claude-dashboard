@@ -43,6 +43,19 @@ session_2026-04-18f:
   - questions.md has open items for guardian: issue-15 spawner, issue-9 nginx setup,
     issue-22 clanker-run changes.
 
+session_2026-04-18h:
+  - Guardian replied to questions: CSP is a browser extension (no action needed); WS
+    still fails but "the nginx config was not the problem".
+  - nginx/clanker.conf (standalone): fixed WS proxy from 127.0.0.1:8043 to [::1]:8043
+    (IPv6 requirement from CLAUDE.md).
+  - ws-server.py: no longer exits if config file not found; warns and starts with
+    empty project list so data.cbor reload still works without a config.
+  - ws-server.py: now sends current RUNNING state to newly connected clients (the
+    comment said it should but the code did not).
+  - questions.md: removed answered CSP question; added diagnostic steps for WS so
+    guardian can identify whether ws-server is running and whether nginx is forwarding
+    the Upgrade header correctly.
+
 session_2026-04-18g:
   - git_status shows issue-22-denied-permissions rebase failed again (session.yaml conflict).
   - Pipelines all green on main.

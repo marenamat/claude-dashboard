@@ -54,6 +54,10 @@ log = logging.getLogger("ws-server")
 
 CLIENTS: set = set()
 
+# Current running state per project name (name → True/False).
+# Updated by watch(); read by handler() on new connections.
+RUNNING: dict[str, bool] = {}
+
 
 # ---------------------------------------------------------------------------
 # Broadcast helpers
@@ -83,6 +87,11 @@ async def handler(ws) -> None:
     try:
         # Send current running state immediately so a freshly loaded page is
         # up-to-date without waiting for the next poll tick.
+        for name, running in RUNNING.items():
+            try:
+                await ws.send(json.dumps({"type": "running", "name": name, "running": running}))
+            except Exception:
+                break
         await ws.wait_closed()
     finally:
         CLIENTS.discard(ws)
@@ -124,6 +133,7 @@ async def watch(config: dict) -> None:
             running = (path / "clanker.lock").exists()
             if last_lock.get(name) != running:
                 last_lock[name] = running
+                RUNNING[name] = running
                 log.info("project %r running=%s", name, running)
                 await broadcast(json.dumps({
                     "type": "running",
@@ -138,11 +148,11 @@ async def watch(config: dict) -> None:
 
 async def main() -> None:
     if not CONFIG_PATH.exists():
-        log.error("Config not found: %s", CONFIG_PATH)
-        sys.exit(1)
-
-    with open(CONFIG_PATH) as f:
-        config = yaml.safe_load(f)
+        log.warning("Config not found: %s — starting without project monitoring", CONFIG_PATH)
+        config: dict = {}
+    else:
+        with open(CONFIG_PATH) as f:
+            config = yaml.safe_load(f) or {}
 
     log.info("Starting WebSocket server on [%s]:%d", WS_HOST, WS_PORT)
 

@@ -23,70 +23,73 @@ spawner:
 
 ---
 
+## WebSocket autoreload still failing (issue #9)
+
+The APKBUILD clanker.conf path fix and the IPv4→IPv6 proxy fix are now committed.
+The CSP error was confirmed to be a browser extension (no action needed).
+
+But the WebSocket still does not work.  To help diagnose, please check and
+report back:
+
+1. **Is ws-server running?**
+
+   ```sh
+   ps aux | grep ws-server
+   ```
+
+2. **Does the log show any startup error?**
+
+   ```sh
+   cat /var/log/claude-dashboard/ws-server.log
+   ```
+
+   (or wherever it was started from — check `$LOGFILE` in your init script)
+
+3. **Can you connect directly to port 8043 with curl?**
+
+   ```sh
+   curl -v --http1.1 -H "Upgrade: websocket" -H "Connection: Upgrade" \
+        http://[::1]:8043/
+   ```
+
+   Expected: `101 Switching Protocols`.  If you get 426, the server is up but
+   not getting the Upgrade header.  If connection refused, the server is not
+   listening.
+
+4. **What does nginx return for /ws without the proxy?**
+
+   Access port 8042 directly from the clanker machine:
+
+   ```sh
+   curl -v --http1.1 -H "Upgrade: websocket" -H "Connection: Upgrade" \
+        http://[::1]:8042/ws
+   ```
+
+   Expected: `101 Switching Protocols` (nginx passes it through to ws-server).
+
+---
+
 ## Required setup for issue-9 (Autoreload WebSocket server)
 
-**Note**: A bug in the APKBUILD was fixed (issue #9) — previously the package
-installed `nginx/clanker.conf` (the standalone full-nginx config with an
-`http {}` wrapper) instead of `packaging/clanker.conf` (the http.d snippet).
-Copying a full nginx config into `/etc/nginx/http.d/` breaks nginx (nested
-`http {}` blocks) and caused the 426 Upgrade Required WebSocket error.
+After installing the updated APK (or running from the dev tree):
 
-After installing the updated APK:
+1. Copy the nginx http.d snippet and reload nginx (APK install only):
 
-1. Copy the nginx http.d snippet and reload nginx:
-
-```
+```sh
 cp /usr/share/claude-dashboard/nginx/clanker.conf /etc/nginx/http.d/
 rc-service nginx reload
 ```
 
 2. Enable and start the WebSocket autoreload service:
 
-```
+```sh
 rc-update add claude-dashboard-ws
 rc-service claude-dashboard-ws start
 ```
 
-3. Create `/etc/claude-dashboard/config.yaml` with your project paths if not
-   done yet (the cron will generate data automatically every 15 minutes).
+3. Create `/etc/claude-dashboard/config.yaml` with your project paths.
+   The server now starts even without this file (logs a warning), but
+   lock-file monitoring won't work until the file exists.
 
 The APK package already provides `py3-websockets` as a dependency, so no
 manual pip/apt install is needed.
-
-*The websocket still fails, the nginx config was not the problem.*
-
----
-
-## CSP inline script violation (issue #9)
-
-After the WS nginx config fix, a browser CSP error appeared:
-
-```
-Content-Security-Policy: The page's settings blocked an inline script
-(script-src-elem) from being executed because it violates the following
-directive: "script-src 'self' 'wasm-unsafe-eval'".
-Consider using a hash ('sha256-nCwXOGJ72MPizaTB2tzvBjGKo7v92xgmtZfSCjZwCWg=')
-or a nonce.
-```
-
-The current CSP in `packaging/clanker.conf` is:
-```
-script-src 'self' 'wasm-unsafe-eval'
-```
-
-We cannot find any inline `<script>` in our code (index.template.html, dashboard.js,
-generate-data.py, src/lib.rs). The hash suggests the browser is blocking a real
-inline script element.
-
-**Guardian: please check the following and report back:**
-
-1. Does this error appear on a fresh page load (no browser extensions)?
-2. Open browser DevTools → Sources → look for an inline script. What file/context
-   is it in?
-3. Does it appear when accessing `localhost:8042` directly (no HTTPS proxy)?
-4. Does the page still work despite the error, or is something broken?
-
-If the hash is stable across reloads, we can whitelist it in the CSP as a
-temporary fix while investigating the source.
-
-*Page works, and the bug is from a browser extension. But the autoreload / WS still doesn't.*
