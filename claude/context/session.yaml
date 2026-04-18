@@ -4,23 +4,22 @@ ci_status:
   main: All pipelines (Build, Deploy, Package) green as of 2026-04-18T11:40:56Z.
 
 issues_pending_review:
-  - 9   # nginx APKBUILD bug fix: branch issue-9-cron-fix
+  - 9   # APKBUILD fix for WS 426 error: branch issue-9-cron-fix
+  - 16  # duplicate clanker remote fix: branch issue-16-fix-clone-commands
+  - 22  # denied permissions dependency doc: branch issue-22-denied-permissions
 
 issues_in_main_not_yet_closed:
   - 21  # spawn from GitHub: already merged in cc9abac
-  - 16  # clone overlay link fix: already merged in 2cb18fd
+  - 16  # clone overlay link fix: already merged in 2cb18fd (further fix in branch)
 
 issues_blocked:
   - 15  # spawner — needs crontab + config.yaml spawner section, see questions.md
+  - 22  # denied permissions — needs clanker-run changes in claude-base, see questions.md
 
 session_2026-04-18e:
-  - Diagnosed issue #9 WS 426 error: APKBUILD was installing nginx/clanker.conf
-    (a standalone full nginx config with http {} wrapper) as the package's nginx
-    snippet. Copying that into /etc/nginx/http.d/ would cause nginx to fail with
-    nested http {} blocks, and /ws would fall through to the static handler
-    returning 426 Upgrade Required.
-  - Fixed APKBUILD: now installs packaging/clanker.conf (the http.d-style snippet
-    with only a server {} block) instead of nginx/clanker.conf.
-  - Fixed packaging/clanker.conf comment: config path was /usr/share/claude-dashboard/
-    config.yaml but scripts use /etc/claude-dashboard/config.yaml.
-  - Updated questions.md to explain the bug and updated post-install steps.
+  - issue #9 APKBUILD fix (previous session): fixed nginx/clanker.conf vs
+    packaging/clanker.conf install path causing WS 426. Branch pending review.
+  - issue #16 clone commands: fixed duplicate clanker remote bug in make_clone_commands().
+    Branch: issue-16-fix-clone-commands.
+  - issue #22 denied permissions: documented dependency on clanker-run changes in
+    claude-base (questions.md). Branch: issue-22-denied-permissions.
