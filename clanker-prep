@@ -559,6 +559,24 @@ def main():
     with open(seen_ids_path, "w") as f:
         yaml.dump({"seen_ids": seen_list}, f, default_flow_style=False)
 
+    # --- Remote main advancement check (issue #21) ---
+    # If the guardian pushed new commits to remote/main (e.g. answering questions,
+    # merging PRs), clanker-prep must trigger Claude even if there are no new issues
+    # or pipeline failures.  We track the remote/main HEAD across runs to detect this.
+    remote = get_fetch_remote()
+    if remote:
+        remote_main_head, _, rc = run(f"git rev-parse {remote}/main")
+        if rc == 0:
+            seen_main_path = context_dir / "seen_remote_main_head.yaml"
+            if seen_main_path.exists():
+                with open(seen_main_path) as f:
+                    prev_main_data = yaml.safe_load(f) or {}
+                prev_main_head = prev_main_data.get("head")
+                if prev_main_head and prev_main_head != remote_main_head:
+                    reasons.append("main branch advanced since last run (guardian pushed new commits)")
+            with open(seen_main_path, "w") as f:
+                yaml.dump({"head": remote_main_head, "recorded_at": now}, f, default_flow_style=False)
+
     # --- Limit retry check (issue #19) ---
     # If the last recorded run hit the usage limit, Claude couldn't finish its
     # work.  Retry as soon as possible (i.e. this run) regardless of other signals.
@@ -589,6 +607,7 @@ def main():
         "claude/context/pipeline_results.yaml",
         "claude/context/seen_issue_comment_ids.yaml",
         "claude/context/seen_pipeline_run_ids.yaml",
+        "claude/context/seen_remote_main_head.yaml",
     }
     dirty_out, _, _ = run("git status --porcelain")
     dirty_files = []
