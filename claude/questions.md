@@ -93,3 +93,24 @@ rc-service claude-dashboard-ws start
 
 The APK package already provides `py3-websockets` as a dependency, so no
 manual pip/apt install is needed.
+
+---
+
+## Dependency for issue-22 (Denied permissions: show full commands)
+
+Issue #22 asks to show the full denied tool calls (e.g. `Bash(ls /foo)` instead
+of just `Bash`) when permissions are denied.
+
+The dashboard displays log excerpts verbatim from `clanker.log`. What gets
+logged is whatever Claude Code CLI outputs. Currently the CLI only prints the
+tool name, not its arguments, when rejecting a tool call.
+
+To fix this, one of the following must happen **in `claude-base` (clanker-run)**:
+
+- When running with `--output-format=stream-json`, Claude Code emits one JSON
+  object per tool call attempt. Denied calls appear in the stream and include
+  the full `input` object. `clanker-run` could detect these events and write
+  a line like `Denied: Bash(ls /foo)` to the log before Claude Code's own
+  summary.
+
+Until that is done, the dashboard has nothing extra to display.
