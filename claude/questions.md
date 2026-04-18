@@ -31,6 +31,9 @@ The CSP error was confirmed to be a browser extension (no action needed).
 But the WebSocket still does not work.  To help diagnose, please check and
 report back:
 
+*The whole problem was caused by an overlay proxy outside of this package's
+reach. Now the websocket works.*
+
 1. **Is ws-server running?**
 
    ```sh
@@ -114,3 +117,5 @@ To fix this, one of the following must happen **in `claude-base` (clanker-run)**
   summary.
 
 Until that is done, the dashboard has nothing extra to display.
+
+*done*
