@@ -613,6 +613,7 @@ def main():
         "claude/context/seen_issue_comment_ids.yaml",
         "claude/context/seen_pipeline_run_ids.yaml",
         "claude/context/seen_remote_main_head.yaml",
+        "clanker-prep.json",
     }
     dirty_out, _, _ = run("git status --porcelain")
     dirty_files = []
@@ -630,6 +631,14 @@ def main():
             dirty_files.append(fname)
     if dirty_files:
         reasons.append(f"uncommitted workdir changes: {', '.join(dirty_files)}")
+
+    # --- Tracked-but-ignored files check ---
+    # Files that are both committed and gitignored cause clanker-prep to see them
+    # as dirty on every run (since they're regenerated but not in PREP_OUTPUTS).
+    ignored_tracked_out, _, _ = run("git ls-files --ignored --exclude-standard")
+    ignored_tracked = [f for f in ignored_tracked_out.splitlines() if f.strip()]
+    if ignored_tracked:
+        reasons.append(f"tracked files should be gitignored (run git rm --cached): {', '.join(ignored_tracked)}")
 
     # --- Decision ---
     decision = "INVOKE_CLAUDE" if reasons else "NOTHING_TO_DO"
