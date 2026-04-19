@@ -2,6 +2,8 @@
 
 set -e
 
+export PATH=$PATH:$HOME/.cargo/bin/:$HOME/.local/bin
+
 self=$(readlink -f "$0")
 selfdir=$(dirname "$self")
 
