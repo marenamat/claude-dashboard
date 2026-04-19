@@ -707,7 +707,7 @@ fn render_project(proj: &ProjectView, now_secs: i64, tz_offset_secs: i64, rates:
   let clone_btn = if !proj.clone_commands.is_empty() {
     format!(
       r#" <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1 clone-btn" data-clone-cmds="{cmds}" data-create-url="{create_url}" title="Show clone commands">clone</button>"#,
-      cmds       = esc(&proj.clone_commands),
+      cmds       = esc(&proj.clone_commands).replace('\n', "&#10;"),
       create_url = esc(&proj.create_repo_url),
     )
   } else {
