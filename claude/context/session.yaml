@@ -4,12 +4,12 @@ ci_status:
   main: All pipelines green (Build, Package, Deploy).
 
 issues_pending_review:
-  - 16  # newline encoding fix for clone commands HTML attr: branch issue-16-fix-clone-newlines
-  - 22  # extract tool_input from permission_denials: branch issue-22-denied-permissions
+  - 16  # WASM renderer newline fix: branch issue-16-wasm-clone-newlines
 
 issues_in_main:
   - 9   # WS autoreload + cron fix: all commits merged (branch pruned)
   - 21  # spawn from GitHub: merged in cc9abac
+  - 22  # extract tool_input from permission_denials: merged
 
 issues_blocked:
   - 15  # spawner — needs crontab + config.yaml spawner section, see questions.md
@@ -89,3 +89,17 @@ session_2026-04-19a:
     Branch now cleanly ahead of main with one commit (f5dc708). Pending guardian merge.
   - No new issues. questions.md open items still pending guardian action (issues #9, #15).
   - issues_pending_review: #16 (issue-16-fix-clone-newlines); #22 merged into main already
+
+session_2026-04-19b:
+  - Pipelines: main all green as of 2026-04-19T19:52Z. Latest run (2026-04-19T19:58Z)
+    still in-progress at context-fetch time (includes claude-base template merge).
+  - issue #16: Found root cause of guardian's "only clone command" report. The static
+    HTML generator (generate-data.py) had the &#10; fix since 68fa837, but the Rust/WASM
+    renderer (src/lib.rs) did NOT. After any WebSocket-triggered live-reload, the WASM
+    regenerates HTML using esc() which skips newlines; browser normalises them to spaces;
+    only one merged line shows in overlay. Fixed: added .replace('\n', "&#10;") in
+    render_project_card() after esc() call. Branch: issue-16-wasm-clone-newlines.
+  - issues_pending_review: #16 (issue-16-wasm-clone-newlines)
+  - issues_blocked: #9 (guardian still needs to enable ws service + nginx conf),
+      #15 (guardian needs crontab + spawner config)
+  - questions.md open items unchanged (guardian action required)
