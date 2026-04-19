@@ -169,7 +169,7 @@ report to `clanker-housekeeping.json` in the repo root.
 }
 ```
 
-Write this file and commit it together with any other context changes.
+Write this file. It is gitignored (not committed to git) and read by the dashboard directly from the filesystem.
 
 The dashboard reads `clanker-housekeeping.json` to display:
 - Issues awaiting review
