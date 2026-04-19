@@ -1,4 +1,4 @@
-recorded_at: '2026-04-18T18:30:00Z'
+recorded_at: '2026-04-19T16:30:00Z'
 
 ci_status:
   main: All pipelines green (Build, Package, Deploy).
@@ -81,3 +81,11 @@ session_2026-04-18i:
   - questions.md cleaned up: removed stale WS diagnostic questions block (WS works now).
   - Pipelines all green on main.
   - Pending guardian merges: issue-16-fix-clone-newlines, issue-22-denied-permissions.
+
+session_2026-04-19a:
+  - Pipeline: main Build+Deploy+Package still in-progress (triggered 2026-04-19T16:03).
+  - issue-16-fix-clone-newlines: rebase was failing (session.yaml conflict). Resolved
+    by keeping HEAD/main session.yaml and rebasing the generate-data.py fix cleanly.
+    Branch now cleanly ahead of main with one commit (f5dc708). Pending guardian merge.
+  - No new issues. questions.md open items still pending guardian action (issues #9, #15).
+  - issues_pending_review: #16 (issue-16-fix-clone-newlines); #22 merged into main already
