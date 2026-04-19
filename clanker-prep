@@ -186,6 +186,9 @@ def do_git_maintenance():
             else:
                 actions.append(f"rebased: {branch}")
 
+        # Switch to main before pruning so we can delete currently-checked-out branches
+        run("git checkout main")
+
         # Prune local branches fully merged into remote/main
         merged_out, _, _ = run(f"git branch --merged {remote}/main")
         for branch in merged_out.splitlines():
